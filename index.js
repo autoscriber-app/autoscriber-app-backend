@@ -20,9 +20,11 @@ app.use(cors());
 app.post("/add", (req, res) => {
   if (req.body.uuid == "") {
     req.body.uuid = uuid.v4();
+    res.send(req.body.uuid);
+  } else {
+    res.sendStatus(res.statusCode);
   }
-  console.log(req.body.message);
-  res.send(req.body.uuid);
+  console.log(req.body);
 });
 
 /**
