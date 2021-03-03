@@ -1,4 +1,4 @@
-//import {v4 as uuidv4} from 'uuid';
+//nimport {v4 as uuidv4} from 'uuid';
 let uuid = require('uuid');
 
  
@@ -10,13 +10,7 @@ const port = 3000
 app.use(bodyParser.json)
 
 // Have the correct body parser
-/**
- * TODO:Create DB with the schema
- * 
- * DB is for storing ML stuff
- * 
- * uuid          procssedMessage
- */
+
 /** 
  * SQL SCHEMA 
  * uuid    message    time
@@ -34,7 +28,6 @@ app.post('/add' , (req, res) => {
     }
     req.body.message
     req.body.timestamp
-
     res.send(req.body.uuid)
 })
 /**
