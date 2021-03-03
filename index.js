@@ -1,15 +1,17 @@
 //import {v4 as uuidv4} from 'uuid';
 let uuid = require('uuid');
-console.log('Your UUID is: ' + uuid.v4());
+
 
 const express = require('express')
+const bodyParser = require('body-parser')
+
 const app = express()
 const port = 3000
-
+app.use(bodyParser.json)
 
 // Have the correct body parser
 
-/**
+/** 
  * SQL SCHEMA 
  * uuid    message    time
  */
@@ -23,11 +25,13 @@ const port = 3000
  * 
  */
 app.post('/add' , (req, res) => {
-    req.body.uuid // IF doesn't assingn it one 
+    if (req.body.uuid == "") {
+        req.body.uuid = uuid.v4()
+    }
     req.body.message
-
-    // put  it to database
     req.body.timestamp
+
+    res.send(req.body.uuid)
 })
 
 function connect () {
