@@ -1,3 +1,5 @@
 secret
 node_modules/
 .unotes/
+env
+.vscode
