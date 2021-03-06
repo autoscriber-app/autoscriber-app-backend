@@ -131,8 +131,11 @@ dmypy.json
 # PyCharm files
 .idea/
 
-# SQL user creds
-sql_pass
+#vscode files
+.vscode
 
 # Mac files
 .DS_Store
+
+# SQL user creds
+sql_pass
