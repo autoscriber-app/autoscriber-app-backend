@@ -16,7 +16,7 @@ mycursor = db.cursor()
 # Setting up sql - Creating Tables
 def create_tables():
     unprocessed = "CREATE TABLE IF NOT EXISTS unprocessed (meetingid char(38) NOT NULL, uid char(38) NOT NULL, " \
-                  "name varchar(255) NOT NULL, message LONGTEXT NOT NULL, time TIMESTAMP NOT NULL DEFAULT " \
+                  "name varchar(255) NOT NULL, dialogue LONGTEXT NOT NULL, time TIMESTAMP NOT NULL DEFAULT " \
                   "CURRENT_TIMESTAMP, PRIMARY KEY (meetingid, time)) DEFAULT CHARSET=utf8; "
     processed = "CREATE TABLE IF NOT EXISTS processed (meetingid char(38) NOT NULL, notes LONGTEXT NOT NULL, " \
                 "date DATE NOT NULL, PRIMARY KEY (meetingid)) DEFAULT CHARSET=utf8; "
@@ -62,6 +62,13 @@ def join_meeting(user: User):
 
 @app.post("/add")
 def add_to_transcript(transcript_entry: TranscriptEntry):
+    user = transcript_entry.user
+    sql = "INSERT INTO unprocessed (meetingid, uid, name, dialogue) VALUES (%s, %s, %s, %s)"
+    vals = (user.meetingid, user.uid, user.name, transcript_entry.dialogue)
+
+    mycursor.execute(sql, vals)
+    db.commit()
+
     return transcript_entry
 
 

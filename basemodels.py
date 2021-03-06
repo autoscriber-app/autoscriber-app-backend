@@ -10,4 +10,3 @@ class User(BaseModel):
 class TranscriptEntry(BaseModel):
     user: User
     dialogue: str
-    timestamp: int
