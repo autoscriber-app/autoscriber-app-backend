@@ -69,7 +69,7 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
     mycursor.execute(sql, vals)
     db.commit()
 
-    return transcript_entry
+    return 200
 
 
 @app.post("/end")
