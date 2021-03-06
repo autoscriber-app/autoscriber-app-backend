@@ -26,7 +26,7 @@ def create_tables():
     print("Tables are ready!")
 create_tables()
 
-
+add_owner= ("")
 # Client makes post request with a dictionary that has "user" key
 # Server responds with User
 @app.post("/start")
@@ -36,7 +36,7 @@ def start_meeting(user: User):
     user['uid'] = uuid.uuid4()
     return user
 
-
+add_user = ("")
 # Client makes post request with a dictionary that has "meetingid" & "user" key
 # Server responds with User
 @app.post("/join")
