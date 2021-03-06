@@ -30,8 +30,8 @@ create_tables()
 
 # Client makes post request with a dictionary that has "name" key
 # Server responds with User
-@app.post("/start")
-def start_meeting(user: User):
+@app.post("/host")
+def host_meeting(user: User):
     user = user.dict()
     user['meetingid'], user['uid'] = str(uuid.uuid4()), str(uuid.uuid4())
 
