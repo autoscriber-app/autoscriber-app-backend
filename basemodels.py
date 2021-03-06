@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class User(BaseModel):
-    meetingid: str = ''
+    meeting_id: str = ''
     uid: str = ''
     name: str = ''
 
