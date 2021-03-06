@@ -128,5 +128,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-#PyCharm files
+# PyCharm files
 .idea/
+
+# SQL user creds
+sql_pass
+
+# Mac files
+.DS_Store
