@@ -2,6 +2,8 @@ from fastapi import FastAPI
 import mysql.connector
 import uuid
 from basemodels import User, TranscriptEntry
+from autoscriber import summarize
+
 
 app = FastAPI()
 db = mysql.connector.connect(
@@ -19,7 +21,7 @@ def create_tables():
                   "name varchar(255) NOT NULL, dialogue LONGTEXT NOT NULL, time TIMESTAMP NOT NULL DEFAULT " \
                   "CURRENT_TIMESTAMP, PRIMARY KEY (meeting_id, time)) DEFAULT CHARSET=utf8;"
     processed = "CREATE TABLE IF NOT EXISTS processed (meeting_id char(38) NOT NULL, notes LONGTEXT NOT NULL, " \
-                "date DATE NOT NULL, PRIMARY KEY (meeting_id)) DEFAULT CHARSET=utf8;"
+                "date DATE NOT NULL DEFAULT (DATE(CURRENT_TIMESTAMP)), PRIMARY KEY (meeting_id)) DEFAULT CHARSET=utf8; "
     meetings = "CREATE TABLE IF NOT EXISTS meetings (meeting_id char(38) NOT NULL, host_uid char(38) NOT NULL, " \
                "PRIMARY KEY (meeting_id)) DEFAULT CHARSET=utf8;"
     for e in (unprocessed, processed, meetings):
@@ -93,4 +95,15 @@ def end_meeting(user: User):
     transcript = []
     for line in dialogue:
         transcript.append({col_names[i][0]: line[i] for i in range(1, len(line))})
-    return user['meeting_id'], transcript
+    
+    # 
+    # Do summarization
+    # 
+    summarized = "summarized"
+
+    sql_insert_summarized = "INSERT INTO processed (meeting_id, notes) VALUES (%s, %s)"
+    vals = (user['meeting_id'], summarized)
+    mycursor.execute(sql_insert_summarized, params=vals)
+    db.commit()
+
+    return summarized
