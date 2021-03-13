@@ -1,9 +1,10 @@
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 import mysql.connector
 from basemodels import User, TranscriptEntry
 from autoscriber import summarize
 import uuid
-import markdown
+import tempfile
 
 
 app = FastAPI()
@@ -42,8 +43,8 @@ def host_meeting(user: User):
 
     # Create meeting in meetings db
     sql_add_meeting = "INSERT INTO meetings (meeting_id, host_uid) VALUES (%s, %s)"
-    vals = (user['meeting_id'], user['uid'])
-    mycursor.execute(sql_add_meeting, params=vals)
+    sql_vals = (user['meeting_id'], user['uid'])
+    mycursor.execute(sql_add_meeting, params=sql_vals)
     db.commit()
 
     return user
@@ -56,8 +57,9 @@ def join_meeting(user: User):
     user = user.dict()
 
     # Check if meeting exists
-    sql_find_meeting = "SELECT * FROM meetings WHERE meeting_id = '%s'" % user["meeting_id"]
-    mycursor.execute(sql_find_meeting)
+    sql_find_meeting = "SELECT * FROM meetings WHERE meeting_id = %s"
+    sql_vals = (user['meeting_id'],)
+    mycursor.execute(sql_find_meeting, params=sql_vals)
 
     if mycursor.fetchone() is not None:
         user["uid"] = str(uuid.uuid4())
@@ -70,8 +72,8 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
     user = transcript_entry.user
 
     sql_add_dialogue = "INSERT INTO unprocessed (meeting_id, uid, name, dialogue) VALUES (%s, %s, %s, %s)"
-    vals = (user.meeting_id, user.uid, user.name, transcript_entry.dialogue)
-    mycursor.execute(sql_add_dialogue, params=vals)
+    sql_vals = (user.meeting_id, user.uid, user.name, transcript_entry.dialogue)
+    mycursor.execute(sql_add_dialogue, params=sql_vals)
     db.commit()
 
     return 200
@@ -82,15 +84,16 @@ def end_meeting(user: User):
     user = user.dict()
 
     # Check `meetings` table to confirm that user is meeting host
-    sql_get_host = "SELECT * FROM meetings WHERE meeting_id = '%s' AND host_uid = '%s'" % (
-    user['meeting_id'], user['uid'])
-    mycursor.execute(sql_get_host)
+    sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s AND host_uid = %s"
+    sql_vals = (user['meeting_id'], user['uid'])
+    mycursor.execute(sql_get_host, params=sql_vals)
     if mycursor.fetchone() is None:
         return "Only host can end meeting."
 
     # Get dialogue blobs from `unprocessed` table
-    sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = '%s' ORDER BY time" % user['meeting_id']
-    mycursor.execute(sql_get_dialogue)
+    sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
+    sql_vals = (user['meeting_id'],)
+    mycursor.execute(sql_get_dialogue, params=sql_vals)
     dialogue = mycursor.fetchall()
 
     # Format transcript for autoscriber.summarize()
@@ -105,16 +108,17 @@ def end_meeting(user: User):
 
     # Insert notes into processed table
     sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
-    vals = (user['meeting_id'], notes, download_link)
-    mycursor.execute(sql_insert_notes, params=vals)
+    sql_vals = (user['meeting_id'], notes, download_link)
+    mycursor.execute(sql_insert_notes, params=sql_vals)
     db.commit()
 
     # Now that meeting is ended, we can clean db of all dialogue from the meeting
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
-    sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = '%s' " % user['meeting_id'],
-                          "DELETE FROM meetings WHERE meeting_id = '%s' " % user['meeting_id'])
-    mycursor.execute(sql_remove_meeting[0])     # Remove from `unprocessed`
-    mycursor.execute(sql_remove_meeting[1])     # Remove from `meetings`
+    sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = %s",
+                          "DELETE FROM meetings WHERE meeting_id = %s")
+    sql_vals = (user['meeting_id'],)
+    mycursor.execute(sql_remove_meeting[0], params=sql_vals)    # Remove from `unprocessed`
+    mycursor.execute(sql_remove_meeting[1], params=sql_vals)    # Remove from `meetings`
     db.commit()
 
     return {"notes": notes, "download_link": download_link}
@@ -123,12 +127,13 @@ def end_meeting(user: User):
 @app.get("/download")
 def download_notes(id: str):
     # Query sql `processed` table from notes
-    sql_get_processed = "SELECT notes FROM processed WHERE meeting_id = '%s'" % id
-    mycursor.execute(sql_get_processed)
+    sql_get_processed = "SELECT notes FROM processed WHERE meeting_id = %s"
+    sql_vals = (id,)
+    mycursor.execute(sql_get_processed, params=sql_vals)
     notes = mycursor.fetchone()[0]
     notes = notes.split('\n')
-    # notes = notes.replace("\n", "  ")   # MD uses double-space to signify new line
-    md = ""
+
+    md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.md')
     for line in notes:
-        md += markdown.markdown("- " + line)
-    return md
+        md_file.write(bytes("- " + line + "  \n", encoding='utf-8'))
+    return StreamingResponse(open(md_file.name, 'rb'), media_type="markdown")
