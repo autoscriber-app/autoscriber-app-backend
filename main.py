@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 import mysql.connector
 from basemodels import User, TranscriptEntry
 from autoscriber import summarize
+from decouple import config
 import uuid
 import tempfile
 import aiofiles
@@ -16,7 +17,8 @@ db = mysql.connector.connect(
     database="autoscriber_app",
 )
 mycursor = db.cursor()
-domain = "http://localhost:8000"
+# DOMAIN is an env variable
+DOMAIN = config('DOMAIN')
 
 
 # Setting up sql - Creating Tables
@@ -105,7 +107,7 @@ def end_meeting(user: User):
     notes = summarize(transcript)
 
     # Generate download link
-    download_link = domain + "/download?id={}".format(user['meeting_id'])
+    download_link = DOMAIN + "/download?id={}".format(user['meeting_id'])
 
     # Insert notes into processed table
     sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
