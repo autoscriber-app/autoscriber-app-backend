@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 import mysql.connector
-import uuid
 from basemodels import User, TranscriptEntry
 from autoscriber import summarize
+import uuid
+import markdown
 
 
 app = FastAPI()
@@ -13,6 +14,7 @@ db = mysql.connector.connect(
     database="autoscriber_app",
 )
 mycursor = db.cursor()
+domain = "http://localhost:8000"
 
 
 # Setting up sql - Creating Tables
@@ -21,7 +23,8 @@ def create_tables():
                   "name varchar(255) NOT NULL, dialogue LONGTEXT NOT NULL, time TIMESTAMP NOT NULL DEFAULT " \
                   "CURRENT_TIMESTAMP, PRIMARY KEY (meeting_id, time)) DEFAULT CHARSET=utf8;"
     processed = "CREATE TABLE IF NOT EXISTS processed (meeting_id char(38) NOT NULL, notes LONGTEXT NOT NULL, " \
-                "date DATE NOT NULL DEFAULT (DATE(CURRENT_TIMESTAMP)), PRIMARY KEY (meeting_id)) DEFAULT CHARSET=utf8; "
+                "download_link TINYTEXT NOT NULL, date DATE NOT NULL DEFAULT (DATE(CURRENT_TIMESTAMP)), PRIMARY KEY (" \
+                "meeting_id)) DEFAULT CHARSET=utf8;"
     meetings = "CREATE TABLE IF NOT EXISTS meetings (meeting_id char(38) NOT NULL, host_uid char(38) NOT NULL, " \
                "PRIMARY KEY (meeting_id)) DEFAULT CHARSET=utf8;"
     for e in (unprocessed, processed, meetings):
@@ -78,32 +81,54 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
 def end_meeting(user: User):
     user = user.dict()
 
-    sql_get_host = "SELECT * FROM meetings WHERE meeting_id = '%s' AND host_uid = '%s'" % (user['meeting_id'], user['uid'])
+    # Check `meetings` table to confirm that user is meeting host
+    sql_get_host = "SELECT * FROM meetings WHERE meeting_id = '%s' AND host_uid = '%s'" % (
+    user['meeting_id'], user['uid'])
     mycursor.execute(sql_get_host)
-
     if mycursor.fetchone() is None:
         return "Only host can end meeting."
 
-    sql_get_dialogue = "SELECT * FROM unprocessed WHERE meeting_id = '%s' ORDER BY time" % user['meeting_id']
+    # Get dialogue blobs from `unprocessed` table
+    sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = '%s' ORDER BY time" % user['meeting_id']
     mycursor.execute(sql_get_dialogue)
     dialogue = mycursor.fetchall()
 
-    sql_get_col_names = "SELECT Column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = N'unprocessed'"
-    mycursor.execute(sql_get_col_names)
-    col_names = mycursor.fetchall()
+    # Format transcript for autoscriber.summarize()
+    # Each line looks like this: "Name: dialogue" and all lines are joined with \n
+    transcript = "\n".join([": ".join(line) for line in dialogue])
 
-    transcript = []
-    for line in dialogue:
-        transcript.append({col_names[i][0]: line[i] for i in range(1, len(line))})
-    
-    # 
-    # Do summarization
-    # 
-    summarized = "summarized"
+    # Summarize notes using autoscriber.summarize()
+    notes = summarize(transcript)
 
-    sql_insert_summarized = "INSERT INTO processed (meeting_id, notes) VALUES (%s, %s)"
-    vals = (user['meeting_id'], summarized)
-    mycursor.execute(sql_insert_summarized, params=vals)
+    # Generate download link
+    download_link = domain + "/download?id={}".format(user['meeting_id'])
+
+    # Insert notes into processed table
+    sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
+    vals = (user['meeting_id'], notes, download_link)
+    mycursor.execute(sql_insert_notes, params=vals)
     db.commit()
 
-    return summarized
+    # Now that meeting is ended, we can clean db of all dialogue from the meeting
+    # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
+    sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = '%s' " % user['meeting_id'],
+                          "DELETE FROM meetings WHERE meeting_id = '%s' " % user['meeting_id'])
+    mycursor.execute(sql_remove_meeting[0])     # Remove from `unprocessed`
+    mycursor.execute(sql_remove_meeting[1])     # Remove from `meetings`
+    db.commit()
+
+    return {"notes": notes, "download_link": download_link}
+
+
+@app.get("/download")
+def download_notes(id: str):
+    # Query sql `processed` table from notes
+    sql_get_processed = "SELECT notes FROM processed WHERE meeting_id = '%s'" % id
+    mycursor.execute(sql_get_processed)
+    notes = mycursor.fetchone()[0]
+    notes = notes.split('\n')
+    # notes = notes.replace("\n", "  ")   # MD uses double-space to signify new line
+    md = ""
+    for line in notes:
+        md += markdown.markdown("- " + line)
+    return md
