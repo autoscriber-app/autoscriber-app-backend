@@ -1,10 +1,11 @@
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
 import mysql.connector
 from basemodels import User, TranscriptEntry
 from autoscriber import summarize
 import uuid
 import tempfile
+import aiofiles
 
 
 app = FastAPI()
@@ -127,13 +128,14 @@ def end_meeting(user: User):
 @app.get("/download")
 def download_notes(id: str):
     # Query sql `processed` table from notes
-    sql_get_processed = "SELECT notes FROM processed WHERE meeting_id = %s"
+    sql_get_processed = "SELECT notes, date FROM processed WHERE meeting_id = %s"
     sql_vals = (id,)
     mycursor.execute(sql_get_processed, params=sql_vals)
-    notes = mycursor.fetchone()[0]
+    notes, date = mycursor.fetchone()
     notes = notes.split('\n')
 
     md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.md')
+    fname = f'{date}-notes.md'
     for line in notes:
         md_file.write(bytes("- " + line + "  \n", encoding='utf-8'))
-    return StreamingResponse(open(md_file.name, 'rb'), media_type="markdown")
+    return FileResponse(md_file.name, media_type="markdown", filename=fname)
