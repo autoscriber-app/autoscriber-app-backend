@@ -1,5 +1,4 @@
 pydantic==1.8.1
 autoscriber==1.0.2
 fastapi==0.63.0
-Markdown==3.3.4
 mysql_connector_repackaged==0.3.1
