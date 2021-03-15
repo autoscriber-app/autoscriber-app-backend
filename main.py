@@ -13,10 +13,11 @@ import uvicorn
 
 
 app = FastAPI()
+user, pswd = open("sql_setup").read().split()
 db = mysql.connector.connect(
     host="localhost",
-    user="root",
-    password=open("sql_pass").read(),
+    user=user,
+    password=pswd,
     database="autoscriber_app"
 )
 mycursor = db.cursor()

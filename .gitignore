@@ -138,4 +138,4 @@ dmypy.json
 .DS_Store
 
 # SQL user creds
-sql_pass
+sql_setup
