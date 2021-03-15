@@ -14,15 +14,15 @@ db = mysql.connector.connect(
     host="localhost",
     user="root",
     password=open("sql_pass").read(),
-    database="autoscriber_app",
+    database="autoscriber_app"
 )
 mycursor = db.cursor()
-# DOMAIN is an env variable
+# Get environ variables
 DOMAIN = config('DOMAIN')
 
 
 # Setting up sql - Creating Tables
-def create_tables():
+def sql_setup():
     unprocessed = "CREATE TABLE IF NOT EXISTS unprocessed (meeting_id char(38) NOT NULL, uid char(38) NOT NULL, " \
                   "name varchar(255) NOT NULL, dialogue LONGTEXT NOT NULL, time TIMESTAMP NOT NULL DEFAULT " \
                   "CURRENT_TIMESTAMP, PRIMARY KEY (meeting_id, time)) DEFAULT CHARSET=utf8;"
@@ -34,7 +34,7 @@ def create_tables():
     for e in (unprocessed, processed, meetings):
         mycursor.execute(e)
     print("Tables are ready!")
-create_tables()
+sql_setup()
 
 
 # Client makes post request with a dictionary that has "name" key
@@ -107,7 +107,7 @@ def end_meeting(user: User):
     notes = summarize(transcript)
 
     # Generate download link
-    download_link = DOMAIN + "/download?id={}".format(user['meeting_id'])
+    download_link = f"{DOMAIN}/download?id={user['meeting_id']}"
 
     # Insert notes into processed table
     sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
