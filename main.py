@@ -14,7 +14,7 @@ import uvicorn
 
 
 app = FastAPI()
-DOMAIN = "http://localhost:8000"
+DOMAIN = "http://107.173.154.34:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
 PASSWORD = os.environ.get('SQL_PASS')
