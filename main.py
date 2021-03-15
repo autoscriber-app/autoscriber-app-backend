@@ -1,14 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 import mysql.connector
 from basemodels import User, TranscriptEntry
 from autoscriber import summarize
-from decouple import config
 import uuid
 import tempfile
 import os
 
-# Not needed for code, but needed for requirements
+# Not needed for code, but dependencies needed for requirements
 import aiofiles
 import uvicorn
 
@@ -73,7 +72,6 @@ def host_meeting(user: User):
     sql_vals = (user['meeting_id'], user['uid'])
     mycursor.execute(sql_add_meeting, params=sql_vals)
     db.commit()
-
     return user
 
 
@@ -88,22 +86,29 @@ def join_meeting(user: User):
     sql_vals = (user['meeting_id'],)
     mycursor.execute(sql_find_meeting, params=sql_vals)
 
-    if mycursor.fetchone() is not None:
-        user["uid"] = str(uuid.uuid4())
-        return user
-    return "Meeting does not exist. Please check with host to ensure your invite link is correct."
+    if mycursor.fetchone() is None:
+        return HTTPException(status_code=406, detail="Meeting does not exist")
+    user["uid"] = str(uuid.uuid4())
+    return user
+
 
 
 @app.post("/add")
 def add_to_transcript(transcript_entry: TranscriptEntry):
     user = transcript_entry.user
 
+    # Check if meeting exists
+    sql_find_meeting = "SELECT * FROM meetings WHERE meeting_id = %s"
+    sql_vals = (user.meeting_id,)
+    mycursor.execute(sql_find_meeting, params=sql_vals)
+    if mycursor.fetchone() is None:
+        return HTTPException(status_code=406, detail="Meeting does not exist")
+
     sql_add_dialogue = "INSERT INTO unprocessed (meeting_id, uid, name, dialogue) VALUES (%s, %s, %s, %s)"
     sql_vals = (user.meeting_id, user.uid, user.name, transcript_entry.dialogue)
     mycursor.execute(sql_add_dialogue, params=sql_vals)
     db.commit()
-
-    return 200
+    return HTTPException(status_code=201, detail="Dialogue added")
 
 
 @app.post("/end")
@@ -115,29 +120,13 @@ def end_meeting(user: User):
     sql_vals = (user['meeting_id'], user['uid'])
     mycursor.execute(sql_get_host, params=sql_vals)
     if mycursor.fetchone() is None:
-        return "Only host can end meeting."
+        return HTTPException(status_code=403, detail="User must be meeting host to end meeting")
 
     # Get dialogue blobs from `unprocessed` table
     sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
     sql_vals = (user['meeting_id'],)
     mycursor.execute(sql_get_dialogue, params=sql_vals)
     dialogue = mycursor.fetchall()
-
-    # Format transcript for autoscriber.summarize()
-    # Each line looks like this: "Name: dialogue" and all lines are joined with \n
-    transcript = "\n".join([": ".join(line) for line in dialogue])
-
-    # Summarize notes using autoscriber.summarize()
-    notes = summarize(transcript)
-
-    # Generate download link
-    download_link = f"{DOMAIN}/download?id={user['meeting_id']}"
-
-    # Insert notes into processed table
-    sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
-    sql_vals = (user['meeting_id'], notes, download_link)
-    mycursor.execute(sql_insert_notes, params=sql_vals)
-    db.commit()
 
     # Now that meeting is ended, we can clean db of all dialogue from the meeting
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
@@ -148,7 +137,31 @@ def end_meeting(user: User):
     mycursor.execute(sql_remove_meeting[1], params=sql_vals)    # Remove from `meetings`
     db.commit()
 
+    # Format transcript for autoscriber.summarize()
+    # Each line looks like this: "Name: dialogue" and all lines are joined with \n
+    transcript = "\n".join([": ".join(line) for line in dialogue])
+
+    # Summarize notes using autoscriber.summarize()
+    # notes = summarize(transcript)
+    notes = md_format(transcript)
+
+    # Generate download link
+    download_link = f"{DOMAIN}/download?id={user['meeting_id']}"
+
+    # Insert notes into processed table
+    sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
+    sql_vals = (user['meeting_id'], notes, download_link)
+    mycursor.execute(sql_insert_notes, params=sql_vals)
+    db.commit()
+
     return {"notes": notes, "download_link": download_link}
+
+
+def md_format(notes):
+    md = ""
+    for line in notes.split('\n'):
+        md += f"- {line}  \n"
+    return md
 
 
 @app.get("/download")
@@ -157,11 +170,13 @@ def download_notes(id: str):
     sql_get_processed = "SELECT notes, date FROM processed WHERE meeting_id = %s"
     sql_vals = (id,)
     mycursor.execute(sql_get_processed, params=sql_vals)
-    notes, date = mycursor.fetchone()
-    notes = notes.split('\n')
+    res = mycursor.fetchone()
+    if res is None:
+        return HTTPException(status_code=406, detail="Meeting does not exist")
+    notes, date = res
 
+    # Create md file for file response
     md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.md')
-    fname = f'{date}-notes.md'
-    for line in notes:
-        md_file.write(bytes("- " + line + "  \n", encoding='utf-8'))
+    fname = f'{date.date()}-notes.md'
+    md_file.write(bytes(notes, encoding='utf-8'))
     return FileResponse(md_file.name, media_type="markdown", filename=fname)
