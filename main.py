@@ -6,7 +6,10 @@ from autoscriber import summarize
 from decouple import config
 import uuid
 import tempfile
+
+# Not needed for code, but needed for requirements
 import aiofiles
+import uvicorn
 
 
 app = FastAPI()
