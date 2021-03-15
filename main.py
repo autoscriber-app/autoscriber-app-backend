@@ -13,7 +13,7 @@ import uvicorn
 
 
 app = FastAPI()
-user, pswd = open("sql_setup").read().split()
+user, pswd = open("sql_setup").read().split('\n')
 db = mysql.connector.connect(
     host="localhost",
     user=user,
