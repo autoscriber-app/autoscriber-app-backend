@@ -29,13 +29,13 @@ mycursor = db.cursor()
 
 # Setting up sql - Creating Tables
 def sql_setup():
-    unprocessed = "CREATE TABLE IF NOT EXISTS unprocessed (meeting_id char(38) NOT NULL, uid char(38) NOT NULL, " \
-                  "name varchar(255) NOT NULL, dialogue LONGTEXT NOT NULL, time TIMESTAMP NOT NULL DEFAULT " \
+    unprocessed = "CREATE TABLE IF NOT EXISTS `unprocessed` (`meeting_id` char(38) NOT NULL, `uid` char(38) NOT NULL, " \
+                  "`name` varchar(255) NOT NULL, `dialogue` LONGTEXT NOT NULL, `time` TIMESTAMP NOT NULL DEFAULT " \
                   "CURRENT_TIMESTAMP, PRIMARY KEY (meeting_id, time)) DEFAULT CHARSET=utf8;"
-    processed = "CREATE TABLE IF NOT EXISTS processed (meeting_id char(38) NOT NULL, notes LONGTEXT NOT NULL, " \
-                "download_link TINYTEXT NOT NULL, date DATE NOT NULL DEFAULT (DATE(CURRENT_TIMESTAMP)), PRIMARY KEY (" \
+    processed = "CREATE TABLE IF NOT EXISTS `processed` (`meeting_id` char(38) NOT NULL, `notes` LONGTEXT NOT NULL, " \
+                "`download_link` TINYTEXT NOT NULL, `date` DATE NOT NULL DEFAULT (DATE(CURRENT_TIMESTAMP)), PRIMARY KEY (" \
                 "meeting_id)) DEFAULT CHARSET=utf8;"
-    meetings = "CREATE TABLE IF NOT EXISTS meetings (meeting_id char(38) NOT NULL, host_uid char(38) NOT NULL, " \
+    meetings = "CREATE TABLE IF NOT EXISTS `meetings` (`meeting_id` char(38) NOT NULL, `host_uid` char(38) NOT NULL, " \
                "PRIMARY KEY (meeting_id)) DEFAULT CHARSET=utf8;"
     for e in (unprocessed, processed, meetings):
         mycursor.execute(e)
