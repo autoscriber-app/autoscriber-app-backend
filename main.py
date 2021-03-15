@@ -6,6 +6,7 @@ from autoscriber import summarize
 from decouple import config
 import uuid
 import tempfile
+import os
 
 # Not needed for code, but needed for requirements
 import aiofiles
@@ -13,16 +14,17 @@ import uvicorn
 
 
 app = FastAPI()
-user, pswd = open("sql_setup").read().split('\n')
+# Get environ variables
+DOMAIN = "http://localhost:8000"
+USER = os.environ.get('SQL_USER')
+PASSWORD = os.environ.get('SQL_PASS')
 db = mysql.connector.connect(
     host="localhost",
-    user=user,
-    password=pswd,
+    user=USER,
+    password=PASSWORD,
     database="autoscriber_app"
 )
 mycursor = db.cursor()
-# Get environ variables
-DOMAIN = config('DOMAIN')
 
 
 # Setting up sql - Creating Tables
