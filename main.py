@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 from basemodels import User, TranscriptEntry
 from autoscriber import summarize
@@ -13,6 +14,13 @@ import uvicorn
 
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 DOMAIN = "http://107.173.154.34:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
