@@ -116,7 +116,6 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
     sql_vals = (user.meeting_id, user.uid, user.name, transcript_entry.dialogue)
     mycursor.execute(sql_add_dialogue, params=sql_vals)
     db.commit()
-    return HTTPException(status_code=201, detail="Dialogue added")
 
 
 @app.post("/end")
