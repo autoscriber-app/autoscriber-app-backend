@@ -10,7 +10,9 @@ pipeline {
 
     stages {
         stage ('Checkout') {
-            checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'github-ssh-key', url: 'git@github.com:autoscriber-app/autoscriber-app-backend.git']]])
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'github-ssh-key', url: 'git@github.com:autoscriber-app/autoscriber-app-backend.git']]])
+            }
         }
         stage('Build') {
             steps {
