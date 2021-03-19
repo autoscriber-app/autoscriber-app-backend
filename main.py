@@ -68,8 +68,9 @@ def sql_setup():
     print("Tables are ready!")
 sql_setup()
 
+
 # Returns a random Uuid with the length of 10; makes sure that uuid isn't taken
-def uuidCreator ():
+def uuidCreator():
     randomUuid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
     sql_check_uuid = "SELECT `meeting_id` FROM meetings WHERE meeting_id=\"%s\""
     sql_vals = (randomUuid,)
@@ -77,12 +78,13 @@ def uuidCreator ():
     if (mycursor.fetchone() is not None):
         return uuidCreator()
     return randomUuid
-# Client makes post request with a dictionary that has "name" key
-# Server responds with User
-@app.post("/host")
-def host_meeting(user: str):
-    user = user.dict()
-    user['meeting_id'], user['uid'] = str(uuidCreator()), str(uuid.uuid4())
+
+
+# Client makes get request
+# Server responds with User dict
+@app.get("/host")
+def host_meeting():
+    user = {'meeting_id': str(uuidCreator()), 'uid': str(uuid.uuid4())}
 
     # Create meeting in meetings db
     sql_add_meeting = "INSERT INTO meetings (meeting_id, host_uid) VALUES (%s, %s)"
@@ -107,7 +109,6 @@ def join_meeting(user: User):
         return HTTPException(status_code=406, detail="Meeting does not exist")
     user["uid"] = str(uuid.uuid4())
     return user
-
 
 
 @app.post("/add")
