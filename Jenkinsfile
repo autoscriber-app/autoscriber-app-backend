@@ -17,7 +17,7 @@ pipeline {
         stage('Build') {
             steps {
                 //  Building new image
-                sh 'docker image build -t autoscriber .'
+                sh 'docker image build -t $IMAGE_NAME .'
                 sh 'docker image tag $IMAGE_NAME:latest $IMAGE_NAME:$BUILD_NUMBER'
                 echo "Image built :P"
             }
