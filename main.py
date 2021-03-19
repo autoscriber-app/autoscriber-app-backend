@@ -26,6 +26,7 @@ DOMAIN = "http://autoscriber.sagg.in:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
 PASSWORD = os.environ.get('SQL_PASS')
+# Connect to mysql db
 db = mysql.connector.connect(
     host="localhost",
     user=USER,
@@ -82,7 +83,7 @@ def uuidCreator():
 
 # Client makes get request
 # Server responds with User dict
-@app.get("/host")
+@app.post("/host")
 def host_meeting():
     user = {'meeting_id': str(uuidCreator()), 'uid': str(uuid.uuid4())}
 
