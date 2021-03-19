@@ -7,7 +7,8 @@ from autoscriber import summarize
 import uuid
 import tempfile
 import os
-
+import random
+import string
 # Not needed for code, but dependencies needed for requirements
 import aiofiles
 import uvicorn
@@ -67,13 +68,21 @@ def sql_setup():
     print("Tables are ready!")
 sql_setup()
 
-
+# Returns a random Uuid with the length of 10; makes sure that uuid isn't taken
+def uuidCreator ():
+    randomUuid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    sql_check_uuid = "SELECT `meeting_id` FROM meetings WHERE meeting_id=\"%s\""
+    sql_vals = (randomUuid,)
+    mycursor.execute(sql_check_uuid, params=sql_vals)
+    if (mycursor.fetchone() is not None):
+        return uuidCreator()
+    return randomUuid
 # Client makes post request with a dictionary that has "name" key
 # Server responds with User
 @app.post("/host")
 def host_meeting(user: User):
     user = user.dict()
-    user['meeting_id'], user['uid'] = str(uuid.uuid4()), str(uuid.uuid4())
+    user['meeting_id'], user['uid'] = str(uuidCreator()), str(uuid.uuid4())
 
     # Create meeting in meetings db
     sql_add_meeting = "INSERT INTO meetings (meeting_id, host_uid) VALUES (%s, %s)"
