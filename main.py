@@ -80,7 +80,7 @@ def uuidCreator ():
 # Client makes post request with a dictionary that has "name" key
 # Server responds with User
 @app.post("/host")
-def host_meeting(user: User):
+def host_meeting(user: str):
     user = user.dict()
     user['meeting_id'], user['uid'] = str(uuidCreator()), str(uuid.uuid4())
 
