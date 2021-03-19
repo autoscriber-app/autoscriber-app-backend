@@ -28,12 +28,12 @@ pipeline {
                     //https://github.com/talha22081992/flask-docker-app-jenkins-pipeline/blob/master/Jenkinsfile
                     //sh 'BUILD_NUMBER = ${BUILD_NUMBER}'
                     if (BUILD_NUMBER == "82") {
-                        sh 'docker run --name $CONTAINER_NAME -d -p 5000:5000 $DOCKER_HUB_REPO'
+                        sh 'docker run --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $IMAGE_NAME'
                     }
                     else {
                         sh 'docker stop $CONTAINER_NAME'
                         sh 'docker rm $CONTAINER_NAME'
-                        sh 'docker run --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $DOCKER_HUB_REPO'
+                        sh 'docker run --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $IMAGE_NAME'
                     }
                     sh 'echo "Latest image/code deployed"'
                 }
