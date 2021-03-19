@@ -24,17 +24,19 @@ pipeline {
         }
         stage('Deploy') {
             steps {
-                //https://github.com/talha22081992/flask-docker-app-jenkins-pipeline/blob/master/Jenkinsfile
-                sh 'BUILD_NUMBER = ${BUILD_NUMBER}'
-                if (BUILD_NUMBER == "1") {
-                    sh 'docker run --name $CONTAINER_NAME -d -p 5000:5000 $DOCKER_HUB_REPO'
+                script{
+                    //https://github.com/talha22081992/flask-docker-app-jenkins-pipeline/blob/master/Jenkinsfile
+                    sh 'BUILD_NUMBER = ${BUILD_NUMBER}'
+                    if (BUILD_NUMBER == "1") {
+                        sh 'dockesr run --name $CONTAINER_NAME -d -p 5000:5000 $DOCKER_HUB_REPO'
+                    }
+                    else {
+                        sh 'docker stop $CONTAINER_NAME'
+                        sh 'docker rm $CONTAINER_NAME'
+                        sh 'docker run --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $DOCKER_HUB_REPO'
+                    }
+                    sh 'echo "Latest image/code deployed"'
                 }
-                else {
-                    sh 'docker stop $CONTAINER_NAME'
-                    sh 'docker rm $CONTAINER_NAME'
-                    sh 'docker run --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $DOCKER_HUB_REPO'
-                }
-                sh 'echo "Latest image/code deployed"'
             }
         }
     }
