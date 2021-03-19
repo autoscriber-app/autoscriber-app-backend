@@ -27,7 +27,7 @@ pipeline {
                 script{
                     //https://github.com/talha22081992/flask-docker-app-jenkins-pipeline/blob/master/Jenkinsfile
                     //sh 'BUILD_NUMBER = ${BUILD_NUMBER}'
-                    if (BUILD_NUMBER == "82") {
+                    if (BUILD_NUMBER == "84") {
                         sh 'docker run --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $IMAGE_NAME'
                     }
                     else {
