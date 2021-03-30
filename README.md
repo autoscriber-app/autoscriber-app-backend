@@ -8,11 +8,12 @@
 pip3 install -r requirements.txt
 ```
 
-2. Make sure sql is configured in `main.py` and create `sql_pass` 
+2. Running the server
 
-3. Running the server
 ```
+pip3 install uvicorn
 uvicorn main:app --reload
 ```
-  - Requests can be made at be at [localhost:8000](http://localhost:8000/)/{endpoint}
-  - Swagger UI interactive API documentation found at [localhost:8000/docs](http://localhost:8000/docs)
+
+- Requests can be made at be at [localhost:8000](http://localhost:8000/)/{endpoint}
+- Swagger UI interactive API documentation found at [localhost:8000/docs](http://localhost:8000/docs)
