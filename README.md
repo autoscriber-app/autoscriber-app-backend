@@ -16,3 +16,8 @@ uvicorn main:app --reload
 ```
   - Requests can be made at be at [localhost:8000](http://localhost:8000/)/{endpoint}
   - Swagger UI interactive API documentation found at [localhost:8000/docs](http://localhost:8000/docs)
+  - Testing can be done using pytest
+```
+pip install -U pytest
+pytest test_main.py
+```
