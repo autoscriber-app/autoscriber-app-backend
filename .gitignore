@@ -139,3 +139,4 @@ dmypy.json
 
 # SQL user creds
 sql_setup
+autoscriber.db
