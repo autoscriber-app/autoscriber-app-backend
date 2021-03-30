@@ -24,8 +24,15 @@ app.add_middleware(
 )
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables
-# Connect to mysql db
-conn = sqlite3.connect('autoscriber.db', check_same_thread=False)
+USER = os.environ.get('SQL_USER')
+PASSWORD = os.environ.get('SQL_PASS')
+db = mysql.connector.connect(
+    host="localhost",
+    user=USER,
+    password=PASSWORD,
+    database="autoscriber_app"
+)
+mycursor = db.cursor()
 
 
 # Setting up sql - Creating Tables
@@ -76,7 +83,7 @@ def uuidCreator():
 
 # Client makes get request
 # Server responds with User dict
-@app.post("/host")
+@app.get("/host")
 def host_meeting():
     user = {'meeting_id': str(uuidCreator()), 'uid': str(uuid.uuid4())}
 
