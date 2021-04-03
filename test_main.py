@@ -1,7 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, params
 from fastapi.testclient import TestClient
+import sqlite3
 import pytest
+import json
 import main
+client = TestClient(main.app)
+conn = sqlite3.connect('autoscriber.db', check_same_thread=False)
 
 
 def isMeetingIdValid(id):
@@ -12,22 +16,18 @@ def test_meetingId():
     assert isMeetingIdValid(newMeetingid)
 
 def test_hostEndpoint () :
-    response = client.get("/host")
-    user = json.loads(response.json())
+    response = client.post("/host")
+    user = json.loads(str (response.text) )
 
-    sql_findMeetingidQuery = "SELECT meeting_id FROM meetings WHERE meeting_id=%s"
-    mycursor.execute(sql_findMeetingidQuery, params= (user['meeting_id']))
-    db.commit()
-    sql_meetingid = mycursor.get_row()
-    sql_findUUIDQuery = "SELECT meeting_id FROM meetings WHERE meeting_id=%s"
-    mycursor.execute(sql_findUUIDQuery, params= (user['user_id']))
-    db.commit()
-    sql_uuid = mycursor.get_row()
-
+    sql_findMeetingidQuery = "SELECT meeting_id FROM meetings WHERE meeting_id=?"
+    sql_vals = (user['meeting_id'],)
+    cursor = conn.execute(sql_findMeetingidQuery, sql_vals)
+    sql_meetingid = cursor.fetchone ()
+    
+    sql_findUUIDQuery = "SELECT meeting_id FROM meetings WHERE meeting_id=?"
+    cursor = conn.execute(sql_findUUIDQuery, (user['uid'],))
+    sql_uuid = cursor.fetchone ()
 
     assert isMeetingIdValid(user["meeting_id"])
-    assert response.json() == {
-        "meeting_id" : str(sql_meetingid),
-        "uid" : str(sql_uuid),
-    }
-    
+    assert str(user["meeting_id"]) == str(sql_meetingid)
+    assert str(user["uid"]) == str(sql_uuid)
