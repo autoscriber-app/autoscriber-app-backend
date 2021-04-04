@@ -4,6 +4,8 @@ import sqlite3
 from pydantic.types import UUID4
 import pytest
 import json
+from basemodels import User, TranscriptEntry
+from requests.models import Response
 import main
 import uuid
 client = TestClient(main.app)
@@ -33,3 +35,15 @@ def test_hostEndpoint () :
     assert uuid.UUID(user["uid"])
     assert user["uid"] == sql_uuid[0]
     assert len(sql_uuid) == 1
+
+def test_joinEndpoint () :
+    hostResponse = client.post("/host")
+    host = json.loads(str(hostResponse.text))
+    userResponse = client.post(
+        "/join",
+        json= {
+            "name" : "TEST USER",
+            "meeting_id" : host["meeting_id"],
+        })
+    user = json.loads(str(userResponse.text))
+    assert uuid.UUID(user["uid"])
