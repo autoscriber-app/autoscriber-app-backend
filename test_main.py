@@ -1,9 +1,11 @@
 from fastapi import FastAPI, params
 from fastapi.testclient import TestClient
 import sqlite3
+from pydantic.types import UUID4
 import pytest
 import json
 import main
+import uuid
 client = TestClient(main.app)
 conn = sqlite3.connect('autoscriber.db', check_same_thread=False)
 
@@ -20,14 +22,14 @@ def test_hostEndpoint () :
     user = json.loads(str (response.text) )
 
     sql_findMeetingidQuery = "SELECT meeting_id FROM meetings WHERE meeting_id=?"
-    sql_vals = (user['meeting_id'],)
-    cursor = conn.execute(sql_findMeetingidQuery, sql_vals)
-    sql_meetingid = cursor.fetchone ()
-    
-    sql_findUUIDQuery = "SELECT meeting_id FROM meetings WHERE meeting_id=?"
-    cursor = conn.execute(sql_findUUIDQuery, (user['uid'],))
-    sql_uuid = cursor.fetchone ()
-
+    sql_meetingid = conn.execute(sql_findMeetingidQuery, (user['meeting_id'],)).fetchone()
     assert isMeetingIdValid(user["meeting_id"])
-    assert str(user["meeting_id"]) == str(sql_meetingid)
-    assert str(user["uid"]) == str(sql_uuid)
+    assert user["meeting_id"] == sql_meetingid[0]
+    assert len(sql_meetingid) == 1
+
+
+    sql_findUUIDQuery = "SELECT host_uid FROM meetings WHERE host_uid=?"
+    sql_uuid = conn.execute(sql_findUUIDQuery, (user['uid'],)).fetchone()
+    assert uuid.UUID(user["uid"])
+    assert user["uid"] == sql_uuid[0]
+    assert len(sql_uuid) == 1
