@@ -60,12 +60,15 @@ def sql_setup():
         conn.execute(e)
     conn.commit()
     print("Tables are ready!")
+
+
 sql_setup()
 
 
 # Returns a random Uuid with the length of 10; makes sure that uuid isn't taken
 def uuidCreator():
-    randomUuid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    randomUuid = ''.join(random.choices(
+        string.ascii_uppercase + string.digits, k=10))
     sql_check_uuid = "SELECT `meeting_id` FROM meetings WHERE meeting_id = ?"
     sql_vals = (randomUuid,)
     cursor = conn.execute(sql_check_uuid, sql_vals)
@@ -108,6 +111,7 @@ def join_meeting(user: User):
 @app.post("/add")
 def add_to_transcript(transcript_entry: TranscriptEntry):
     user = transcript_entry.user
+    print(user)
 
     # Check if meeting exists
     sql_find_meeting = "SELECT * FROM meetings WHERE meeting_id = ?"
@@ -117,7 +121,8 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
         return HTTPException(status_code=406, detail="Meeting does not exist")
 
     sql_add_dialogue = "INSERT INTO unprocessed (meeting_id, uid, name, dialogue) VALUES (?, ?, ?, ?)"
-    sql_vals = (user.meeting_id, user.uid, user.name, transcript_entry.dialogue)
+    sql_vals = (user.meeting_id, user.uid,
+                user.name, transcript_entry.dialogue)
     conn.execute(sql_add_dialogue, sql_vals)
     conn.commit()
 
@@ -144,7 +149,8 @@ def end_meeting(user: User):
     sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = ?",
                           "DELETE FROM meetings WHERE meeting_id = ?")
     sql_vals = (user['meeting_id'],)
-    conn.execute(sql_remove_meeting[0], sql_vals)    # Remove from `unprocessed`
+    # Remove from `unprocessed`
+    conn.execute(sql_remove_meeting[0], sql_vals)
     conn.execute(sql_remove_meeting[1], sql_vals)    # Remove from `meetings`
     conn.commit()
 
