@@ -47,3 +47,20 @@ def test_joinEndpoint () :
         })
     user = json.loads(str(userResponse.text))
     assert uuid.UUID(user["uid"])
+
+def test_addEndpoint() :
+    hostResponse = client.post("/host")
+    host = json.loads(str(hostResponse.text))
+    hostUser = User(meeting_id = host["meeting_id"], uid = host["uid"], name = "TEST HOST")
+    transcript_entry = TranscriptEntry(user=hostUser, dialogue="TEST DIALOUGE")
+    
+    transcript_entryJSON = transcript_entry.json()
+    hostResponse = client.post("/add", json=transcript_entryJSON)
+    assert hostResponse.status_code == 200
+    
+    sql_addQuery = "SELECT uid, name, dialogue FROM unprocessed WHERE meeting_id = ?"
+    sql_add = conn.execute(sql_addQuery, (hostUser.meeting_id,)).fetchone()
+
+    assert transcript_entry.user.uid == sql_add[0]
+    assert transcript_entry.user.name == sql_add[1]
+    assert transcript_entry.dialogue == sql_add[2]
