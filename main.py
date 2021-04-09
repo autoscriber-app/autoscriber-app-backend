@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 from basemodels import User, TranscriptEntry
-# from autoscriber import summarize
+from autoscriber import summarize
 import uuid
 import tempfile
 import os
@@ -68,12 +68,15 @@ def sql_setup():
     for e in (unprocessed, processed, meetings):
         mycursor.execute(e)
     print("Tables are ready!")
+
+
 sql_setup()
 
 
 # Returns a random Uuid with the length of 10; makes sure that uuid isn't taken
 def uuidCreator():
-    randomUuid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    randomUuid = ''.join(random.choices(
+        string.ascii_uppercase + string.digits, k=10))
     sql_check_uuid = "SELECT `meeting_id` FROM meetings WHERE meeting_id=\"%s\""
     sql_vals = (randomUuid,)
     mycursor.execute(sql_check_uuid, params=sql_vals)
@@ -125,7 +128,8 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
         return HTTPException(status_code=406, detail="Meeting does not exist")
 
     sql_add_dialogue = "INSERT INTO unprocessed (meeting_id, uid, name, dialogue) VALUES (%s, %s, %s, %s)"
-    sql_vals = (user.meeting_id, user.uid, user.name, transcript_entry.dialogue)
+    sql_vals = (user.meeting_id, user.uid,
+                user.name, transcript_entry.dialogue)
     mycursor.execute(sql_add_dialogue, params=sql_vals)
     db.commit()
 
@@ -142,7 +146,7 @@ def end_meeting(user: User):
         return HTTPException(status_code=403, detail="User must be meeting host to end meeting")
 
     # Get dialogue blobs from `unprocessed` table
-    sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
+    sql_get_dialogue = "SELECT dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
     sql_vals = (user['meeting_id'],)
     mycursor.execute(sql_get_dialogue, params=sql_vals)
     dialogue = mycursor.fetchall()
@@ -152,17 +156,19 @@ def end_meeting(user: User):
     sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = %s",
                           "DELETE FROM meetings WHERE meeting_id = %s")
     sql_vals = (user['meeting_id'],)
-    mycursor.execute(sql_remove_meeting[0], params=sql_vals)    # Remove from `unprocessed`
-    mycursor.execute(sql_remove_meeting[1], params=sql_vals)    # Remove from `meetings`
+    # Remove from `unprocessed`
+    mycursor.execute(sql_remove_meeting[0], params=sql_vals)
+    # Remove from `meetings`
+    mycursor.execute(sql_remove_meeting[1], params=sql_vals)
     db.commit()
 
     # Format transcript for autoscriber.summarize()
     # Each line looks like this: "Name: dialogue" and all lines are joined with \n
-    transcript = "\n".join([": ".join(line) for line in dialogue])
+    transcript = "\n".join([line[0] for line in dialogue])
 
     # Summarize notes using autoscriber.summarize()
-    # notes = summarize(transcript)
-    notes = md_format(transcript)
+    notes = summarize(transcript)
+    notes = md_format(notes)
 
     # Generate download link
     download_link = f"{DOMAIN}/download?id={user['meeting_id']}"
@@ -178,12 +184,12 @@ def end_meeting(user: User):
 
 def md_format(notes):
     md = ""
-    for line in notes.split('\n'):
+    for line in notes:
         md += f"- {line}  \n"
     return md
 
 
-@app.get("/download")
+@ app.get("/download")
 def download_notes(id: str):
     # Query sql `processed` table from notes
     sql_get_processed = "SELECT notes, date FROM processed WHERE meeting_id = %s"
