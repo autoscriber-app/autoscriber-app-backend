@@ -1,9 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
-from basemodels import User, TranscriptEntry
 from autoscriber import summarize
+
+from basemodels import User, TranscriptEntry
+from WSConnectionManager import ConnectionManager
+
 import uuid
 import tempfile
 import os
@@ -35,6 +38,7 @@ db = mysql.connector.connect(
     database="autoscriber_app"
 )
 mycursor = db.cursor()
+manager = ConnectionManager()
 
 
 # Setting up sql - Creating Tables
@@ -85,6 +89,14 @@ def uuidCreator():
     return randomUuid
 
 
+# Checks if user is host of a current meeting
+def is_host(user: User):
+    sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s AND host_uid = %s"
+    sql_vals = (user['meeting_id'], user['uid'])
+    mycursor.execute(sql_get_host, params=sql_vals)
+    return mycursor.fetchone() is not None
+
+
 # Client makes get request
 # Server responds with User dict
 @app.post("/host")
@@ -97,6 +109,22 @@ def host_meeting():
     mycursor.execute(sql_add_meeting, params=sql_vals)
     db.commit()
     return user
+
+
+@app.websocket("/hostWS")
+async def host_websocket_endpoint(websocket: WebSocket, user: User):
+    if not is_host(user):
+        return HTTPException(status_code=403, detail="Only host of current meeting can connect to this endpoint")
+
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await manager.send_personal_message(f"You wrote: {data}", websocket)
+            # await manager.broadcast(f"Client #{client_id} says: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        end_meeting(user)
 
 
 # Client makes post request with a dictionary that has "meeting_id" & "name" key
@@ -139,10 +167,7 @@ def end_meeting(user: User):
     user = user.dict()
 
     # Check `meetings` table to confirm that user is meeting host
-    sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s AND host_uid = %s"
-    sql_vals = (user['meeting_id'], user['uid'])
-    mycursor.execute(sql_get_host, params=sql_vals)
-    if mycursor.fetchone() is None:
+    if not is_host(user):
         return HTTPException(status_code=403, detail="User must be meeting host to end meeting")
 
     # Get dialogue blobs from `unprocessed` table
