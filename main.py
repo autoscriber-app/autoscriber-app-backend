@@ -97,6 +97,15 @@ def is_host(user: User):
     return mycursor.fetchone() is not None
 
 
+# Checks if meeting id corresponds to a current meeting
+@app.post("/is_valid_meeting")
+def is_valid_meeting(meeting_id: str):
+    sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s"
+    sql_vals = (meeting_id,)
+    mycursor.execute(sql_get_host, params=sql_vals)
+    return mycursor.fetchone() is not None
+
+
 # Client makes get request
 # Server responds with User dict
 @app.post("/host")
