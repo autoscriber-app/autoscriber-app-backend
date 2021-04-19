@@ -18,15 +18,6 @@ import uvicorn
 
 
 app = FastAPI()
-origins = ["https://autoscriber-app.github.io"]
-origins = ["*"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
