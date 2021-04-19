@@ -121,7 +121,8 @@ def host_meeting():
 
 
 @app.websocket("/hostWS")
-async def host_websocket_endpoint(websocket: WebSocket, user: User):
+async def host_websocket_endpoint(websocket: WebSocket, meeting_id: str, uid: str):
+    user = {"meeting_id": meeting_id, "uid": uid}
     if not is_host(user):
         return HTTPException(status_code=403, detail="Only host of current meeting can connect to this endpoint")
 
@@ -129,7 +130,7 @@ async def host_websocket_endpoint(websocket: WebSocket, user: User):
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.send_personal_message(f"You wrote: {data}", websocket)
+            # await manager.send_personal_message(f"You wrote: {data}", websocket)
             # await manager.broadcast(f"Client #{client_id} says: {data}")
     except WebSocketDisconnect:
         manager.disconnect(websocket)
