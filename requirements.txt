@@ -4,3 +4,4 @@ autoscriber==1.0.3
 fastapi==0.63.0
 mysql-connector-python==8.0.23
 uvicorn==0.13.4
+webscokets==8.1
