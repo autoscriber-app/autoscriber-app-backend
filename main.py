@@ -18,7 +18,8 @@ import uvicorn
 
 
 app = FastAPI()
-origins = ["https://autoscriber.sagg.in:8000/"]
+origins = ["https://autoscriber-app.github.io"]
+origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -26,7 +27,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-DOMAIN = "http://autoscriber.sagg.in:8000"
+DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
 PASSWORD = os.environ.get('SQL_PASS')
@@ -121,18 +122,19 @@ def host_meeting():
 
 
 @app.websocket("/hostWS")
-async def host_websocket_endpoint(websocket: WebSocket, meeting_id: str, uid: str):
+async def host_websocket(websocket: WebSocket, uid: str, meeting_id: str):
     user = {"meeting_id": meeting_id, "uid": uid}
     if not is_host(user):
         return HTTPException(status_code=403, detail="Only host of current meeting can connect to this endpoint")
 
     await manager.connect(websocket)
+
     try:
         while True:
             data = await websocket.receive_text()
             # await manager.send_personal_message(f"You wrote: {data}", websocket)
             # await manager.broadcast(f"Client #{client_id} says: {data}")
-    except WebSocketDisconnect:
+    except WebSocketDisconnect as e:
         manager.disconnect(websocket)
         end_meeting(user)
 
