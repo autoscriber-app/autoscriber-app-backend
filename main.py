@@ -115,6 +115,7 @@ def host_meeting():
 @app.websocket("/hostWS")
 async def host_websocket(websocket: WebSocket, uid: str, meeting_id: str):
     user = {"meeting_id": meeting_id, "uid": uid}
+    await websocket.accept()
 
     try:
         while True:
