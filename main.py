@@ -115,10 +115,6 @@ def host_meeting():
 @app.websocket("/hostWS")
 async def host_websocket(websocket: WebSocket, uid: str, meeting_id: str):
     user = {"meeting_id": meeting_id, "uid": uid}
-    if not is_host(user):
-        return HTTPException(status_code=403, detail="Only host of current meeting can connect to this endpoint")
-
-    await manager.connect(websocket)
 
     try:
         while True:
