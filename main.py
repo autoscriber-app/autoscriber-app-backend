@@ -171,10 +171,10 @@ def end_meeting(user: User):
         return HTTPException(status_code=403, detail="User must be meeting host to end meeting")
 
     # Get dialogue blobs from `unprocessed` table
-    sql_get_dialogue = "SELECT dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
+    sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
     sql_vals = (user['meeting_id'],)
     mycursor.execute(sql_get_dialogue, params=sql_vals)
-    dialogue = mycursor.fetchall()
+    unprocessed = mycursor.fetchall()
 
     # Now that meeting is ended, we can clean db of all dialogue from the meeting
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
@@ -188,8 +188,13 @@ def end_meeting(user: User):
     db.commit()
 
     # Format transcript for autoscriber.summarize()
-    # Each line looks like this: "Name: dialogue" and all lines are joined with \n
-    transcript = "\n".join([line[0] for line in dialogue])
+    transcript = []
+    for line in unprocessed:
+        name, dialogue = line[0], line[1].strip()
+        if dialogue[-1] not in "!.,":
+            dialogue += "."
+        transcript.append(f"{name}: {dialogue}")
+    transcript = " \n".join(transcript)
 
     # Summarize notes using autoscriber.summarize()
     notes = summarize(transcript)
