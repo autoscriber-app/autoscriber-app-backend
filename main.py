@@ -90,7 +90,7 @@ def is_host(user: User):
 
 
 # Checks if meeting id corresponds to a current meeting
-@app.get("/is_valid_meeting")
+@app.post("/is_valid_meeting")
 def is_valid_meeting(meeting_id: str):
     sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s"
     sql_vals = (meeting_id,)
