@@ -114,7 +114,7 @@ def host_meeting():
 
 @app.websocket("/hostWS/{meeting_id}/{uid}")
 async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
-    user = {"meeting_id": meeting_id, "uid": uid}
+    user = User(meeting_id=meeting_id, uid=uid)
     await manager.connect(websocket)
 
     try:
