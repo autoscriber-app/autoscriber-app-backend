@@ -134,12 +134,9 @@ def join_meeting(user: User):
     user = user.dict()
 
     # Check if meeting exists
-    sql_find_meeting = "SELECT * FROM meetings WHERE meeting_id = %s"
-    sql_vals = (user['meeting_id'],)
-    mycursor.execute(sql_find_meeting, params=sql_vals)
-
-    if mycursor.fetchone() is None:
+    if not is_valid_meeting(meeting_id=user['meeting_id']):
         return HTTPException(status_code=406, detail="Meeting does not exist")
+
     user["uid"] = str(uuid.uuid4())
     return user
 
@@ -149,10 +146,7 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
     user = transcript_entry.user
 
     # Check if meeting exists
-    sql_find_meeting = "SELECT * FROM meetings WHERE meeting_id = %s"
-    sql_vals = (user.meeting_id,)
-    mycursor.execute(sql_find_meeting, params=sql_vals)
-    if mycursor.fetchone() is None:
+    if not is_valid_meeting(meeting_id=user.meeting_id):
         return HTTPException(status_code=406, detail="Meeting does not exist")
 
     sql_add_dialogue = "INSERT INTO unprocessed (meeting_id, uid, name, dialogue) VALUES (%s, %s, %s, %s)"
@@ -219,7 +213,7 @@ def md_format(notes):
     return md
 
 
-@ app.get("/download")
+@app.get("/download")
 def download_notes(id: str):
     # Query sql `processed` table from notes
     sql_get_processed = "SELECT notes, date FROM processed WHERE meeting_id = %s"
