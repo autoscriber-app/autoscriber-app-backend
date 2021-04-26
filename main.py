@@ -112,10 +112,12 @@ def host_meeting():
     return user
 
 
+# Websocket for host to connect to
 @app.websocket("/hostWS/{meeting_id}/{uid}")
 async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     user = User(meeting_id=meeting_id, uid=uid)
-    await manager.connect(websocket)
+    if is_host(user):
+        await manager.connect(websocket)
 
     try:
         while True:
@@ -123,8 +125,8 @@ async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
             # await manager.send_personal_message(f"You wrote: {data}", websocket)
             # await manager.broadcast(f"Client #{client_id} says: {data}")
     except WebSocketDisconnect as e:
-        manager.disconnect(websocket)
         end_meeting(user)
+        manager.disconnect(websocket)
 
 
 # Client makes post request with a dictionary that has "meeting_id" & "name" key
@@ -172,14 +174,7 @@ def end_meeting(user: User):
 
     # Now that meeting is ended, we can clean db of all dialogue from the meeting
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
-    sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = %s",
-                          "DELETE FROM meetings WHERE meeting_id = %s")
-    sql_vals = (user['meeting_id'],)
-    # Remove from `unprocessed`
-    mycursor.execute(sql_remove_meeting[0], params=sql_vals)
-    # Remove from `meetings`
-    mycursor.execute(sql_remove_meeting[1], params=sql_vals)
-    db.commit()
+    remove_meeting(meeting_id=user['meeting_id'])
 
     # Format transcript for autoscriber.summarize()
     transcript = []
@@ -204,6 +199,18 @@ def end_meeting(user: User):
     db.commit()
 
     return {"notes": notes, "download_link": download_link}
+
+
+# Removes a given meeting_id from `unprocessed` and `meetings` tables
+def remove_meeting(meeting_id: str):
+    sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = %s",
+                          "DELETE FROM meetings WHERE meeting_id = %s")
+    sql_vals = (meeting_id,)
+    # Remove from `unprocessed`
+    mycursor.execute(sql_remove_meeting[0], params=sql_vals)
+    # Remove from `meetings`
+    mycursor.execute(sql_remove_meeting[1], params=sql_vals)
+    db.commit()
 
 
 def md_format(notes):
