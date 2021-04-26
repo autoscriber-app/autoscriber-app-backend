@@ -117,7 +117,7 @@ def host_meeting():
 async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     user = User(meeting_id=meeting_id, uid=uid)
     if is_host(user):
-        await manager.connect(websocket)
+        await manager.connect(websocket, user)
 
     try:
         while True:
@@ -125,8 +125,8 @@ async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
             # await manager.send_personal_message(f"You wrote: {data}", websocket)
             # await manager.broadcast(f"Client #{client_id} says: {data}")
     except WebSocketDisconnect as e:
+        manager.disconnect(websocket, user)
         end_meeting(user)
-        manager.disconnect(websocket)
 
 
 # Client makes post request with a dictionary that has "meeting_id" & "name" key
