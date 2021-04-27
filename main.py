@@ -83,6 +83,8 @@ def uuidCreator():
 
 # Checks if user is host of a current meeting
 def is_host(user: User):
+    if isinstance(user, User):
+        user = user.dict()
     sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s AND host_uid = %s"
     sql_vals = (user['meeting_id'], user['uid'])
     mycursor.execute(sql_get_host, params=sql_vals)
@@ -102,7 +104,7 @@ def is_valid_meeting(meeting_id: str):
 # Server responds with User dict
 @app.post("/host")
 def host_meeting():
-    user = {'meeting_id': str(uuidCreator()), 'uid': str(uuid.uuid4())}
+    user = {'meeting_id': uuidCreator(), 'uid': str(uuid.uuid4())}
 
     # Create meeting in meetings db
     sql_add_meeting = "INSERT INTO meetings (meeting_id, host_uid) VALUES (%s, %s)"
