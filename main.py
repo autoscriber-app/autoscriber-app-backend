@@ -116,8 +116,10 @@ def host_meeting():
 @app.websocket("/hostWS/{meeting_id}/{uid}")
 async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     user = User(meeting_id=meeting_id, uid=uid)
-    if is_host(user):
-        await manager.connect(websocket, user)
+    # Check that user is host
+    if not is_host(user):
+        return HTTPException(status_code=403, detail="User must be meeting host to establish WS connection at this endpoint")
+    await manager.connect(websocket, user)
 
     try:
         while True:
@@ -141,6 +143,19 @@ def join_meeting(user: User):
 
     user["uid"] = str(uuid.uuid4())
     return user
+
+
+# WebSocket for users to connect to
+@app.websocket("/joinWS/{meeting_id}/{uid}")
+async def join_websocket(websocket: WebSocket, meeting_id: str, uid: str):
+    user = User(meeting_id=meeting_id, uid=uid)
+    await manager.connect(websocket, user)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+    except WebSocketDisconnect as e:
+        manager.disconnect(websocket, user)
 
 
 @app.post("/add")
@@ -197,6 +212,12 @@ def end_meeting(user: User):
     sql_vals = (user['meeting_id'], notes, download_link)
     mycursor.execute(sql_insert_notes, params=sql_vals)
     db.commit()
+
+    # Broadcast download link to all users in this meeting
+    manager.broadcast_meeting(message=download_link,
+                              meeting_id=user['meeting_id'])
+    # Disconnect WS connection for all users in this meeting
+    manager.close_meeting(meeting_id=user['meeting_id'])
 
     return {"notes": notes, "download_link": download_link}
 

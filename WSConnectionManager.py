@@ -1,7 +1,7 @@
 from fastapi import WebSocket
 from basemodels import User
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Optional
 
 
 class ConnectionManager:
@@ -15,12 +15,26 @@ class ConnectionManager:
         # The keys are uid(user id) and the values are corresponding WebSocket
         self.active_users: Dict[str, WebSocket] = {}
 
+    # Accepts a single websocket and adds to self.meetings and self.active_users
     async def connect(self, websocket: WebSocket, user: User):
         await websocket.accept()
         # Add user to meetings and active_users to keep track of them
         self.meetings[user.meeting_id][user.uid] = websocket
         self.active_users[user.uid] = websocket
 
+    # Closes and removes a single websocket
+    async def close(self, user: User, websocket: Optional[WebSocket] = None):
+        if not websocket:
+            websocket = self.active_users[user.uid]
+        await websocket.close()
+
+    async def close_meeting(self, meeting_id: str):
+        for uid in self.meetings[meeting_id]:
+            user = User(meeting_id=meeting_id, uid=uid)
+            await self.close(user=user)
+        self.meetings.pop()
+
+    # Removes a single websocket from self.meetings and self.active_users
     def disconnect(self, websocket: WebSocket, user: User):
         # Remove from self.meetings if exists
         if user.meeting_id in self.meetings and \
@@ -49,5 +63,5 @@ class ConnectionManager:
     # Broadcast a message to all active users in the given meeting
     async def broadcast_meeting(self, message: str, meeting_id: str):
         if meeting_id in self.meetings:
-            for connection in self.meetings[meeting_id]:
+            for connection in self.meetings[meeting_id].values():
                 await connection.send_text(message)
