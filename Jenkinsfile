@@ -33,7 +33,7 @@ pipeline {
                     else {
                         sh 'docker stop $CONTAINER_NAME'
                         sh 'docker rm $CONTAINER_NAME'
-                        sh 'docker run --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $IMAGE_NAME'
+                        sh 'docker run --restart unless-stopped --name $CONTAINER_NAME -d -e SQL_USER=$SQL_USER -e SQL_PASS=$SQL_PASS --net=host $IMAGE_NAME'
                     }
                     sh 'echo "Latest image/code deployed"'
                 }
