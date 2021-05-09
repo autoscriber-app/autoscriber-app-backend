@@ -18,7 +18,8 @@ import uvicorn
 
 
 app = FastAPI(title="Autoscriber App",
-              description="Automatic online meeting notes with voice recognition and NLP.")
+              description="Automatic online meeting notes with voice recognition and NLP.",
+              version="0.0.1")
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
@@ -91,6 +92,10 @@ def is_host(user: User):
     mycursor.execute(sql_get_host, params=sql_vals)
     return mycursor.fetchone() is not None
 
+@app.get("/version")
+def get_version():
+    return app.version
+
 
 # Checks if meeting id corresponds to a current meeting
 @app.post("/is_valid_meeting")
@@ -127,8 +132,6 @@ async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     try:
         while True:
             data = await websocket.receive_text()
-            # await manager.send_personal_message(f"You wrote: {data}", websocket)
-            # await manager.broadcast(f"Client #{client_id} says: {data}")
     except WebSocketDisconnect as e:
         manager.disconnect(websocket, user)
         end_meeting(user)
