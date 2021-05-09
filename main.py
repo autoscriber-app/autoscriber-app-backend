@@ -17,7 +17,8 @@ import aiofiles
 import uvicorn
 
 
-app = FastAPI()
+app = FastAPI(title="Autoscriber App",
+              description="Automatic online meeting notes with voice recognition and NLP.")
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
@@ -192,6 +193,9 @@ def end_meeting(user: User):
     # Now that meeting is ended, we can clean db of all dialogue from the meeting
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
     remove_meeting(meeting_id=user['meeting_id'])
+    # Broadcast that meeting is ended.
+    manager.broadcast_meeting(
+        json={"event": "end_meeting"}, meeting_id=user['meeting_id'])
 
     # Format transcript for autoscriber.summarize()
     transcript = []
@@ -216,7 +220,7 @@ def end_meeting(user: User):
     db.commit()
 
     # Broadcast download link to all users in this meeting
-    manager.broadcast_meeting(json={"event": "end_meeting", "download_link": download_link},
+    manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link},
                               meeting_id=user['meeting_id'])
     # Disconnect WS connection for all users in this meeting
     manager.close_meeting(meeting_id=user['meeting_id'])
