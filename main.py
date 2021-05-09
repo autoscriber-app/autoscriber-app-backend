@@ -121,13 +121,14 @@ def host_meeting():
 
 
 # Websocket for host to connect to
-@app.websocket("/ws/{ws_type}/{meeting_id}/{uid}")
-async def host_websocket(websocket: WebSocket, ws_type: str, meeting_id: str, uid: str):
+@app.websocket("/ws/{meeting_id}/{uid}")
+async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     user = User(meeting_id=meeting_id, uid=uid)
+    host_ws = False
     
     # If host WS, Check that user is host
-    if ws_type == "host" and not is_host(user):
-        return HTTPException(status_code=403, detail="User must be meeting host to establish WS connection at this endpoint")
+    if is_host(user):
+        host_ws = True
     await manager.connect(websocket, user)
 
     try:
@@ -135,7 +136,7 @@ async def host_websocket(websocket: WebSocket, ws_type: str, meeting_id: str, ui
             data = await websocket.receive_text()
     except WebSocketDisconnect as e:
         manager.disconnect(websocket, user)
-        if ws_type == "host":
+        if host_ws:
             end_meeting(user)
 
 
@@ -151,19 +152,6 @@ def join_meeting(user: User):
 
     user["uid"] = str(uuid.uuid4())
     return user
-
-
-# # WebSocket for users to connect to
-# @app.websocket("/joinWS/{meeting_id}/{uid}")
-# async def join_websocket(websocket: WebSocket, meeting_id: str, uid: str):
-#     user = User(meeting_id=meeting_id, uid=uid)
-#     await manager.connect(websocket, user)
-
-#     try:
-#         while True:
-#             data = await websocket.receive_text()
-#     except WebSocketDisconnect as e:
-#         manager.disconnect(websocket, user)
 
 
 @app.post("/add")
