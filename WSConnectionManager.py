@@ -55,13 +55,13 @@ class ConnectionManager:
             if uid in self.active_users:
                 await self.active_users[uid].send_text(message)
 
-    # Broadcast a message to all active users
-    async def broadcast_active_users(self, message: str):
+    # Broadcast a JSON to all active users
+    async def broadcast_active_users(self, json: dict):
         for connection in self.active_users.values():
-            await connection.send_text(message)
+            await connection.send_json(json)
 
-    # Broadcast a message to all active users in the given meeting
-    async def broadcast_meeting(self, message: str, meeting_id: str):
+    # Broadcast a JSON to all active users in the given meeting
+    async def broadcast_meeting(self, json: dict, meeting_id: str):
         if meeting_id in self.meetings:
             for connection in self.meetings[meeting_id].values():
-                await connection.send_text(message)
+                await connection.send_json(json)

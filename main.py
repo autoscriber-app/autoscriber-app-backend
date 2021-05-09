@@ -216,7 +216,7 @@ def end_meeting(user: User):
     db.commit()
 
     # Broadcast download link to all users in this meeting
-    manager.broadcast_meeting(message=download_link,
+    manager.broadcast_meeting(json={"event": "end_meeting", "download_link": download_link},
                               meeting_id=user['meeting_id'])
     # Disconnect WS connection for all users in this meeting
     manager.close_meeting(meeting_id=user['meeting_id'])
