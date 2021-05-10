@@ -20,6 +20,15 @@ import uvicorn
 app = FastAPI(title="Autoscriber App",
               description="Automatic online meeting notes with voice recognition and NLP.",
               version="0.0.1")
+# origins = ["https://autoscriber-app.github.io"]
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
@@ -122,7 +131,7 @@ def host_meeting():
 
 # Websocket for host to connect to
 @app.websocket("/ws/{meeting_id}/{uid}")
-async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
+async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     user = User(meeting_id=meeting_id, uid=uid)
     host_ws = False
     
@@ -137,7 +146,7 @@ async def host_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     except WebSocketDisconnect as e:
         manager.disconnect(websocket, user)
         if host_ws:
-            end_meeting(user)
+            await end_meeting(user)
 
 
 # Client makes post request with a dictionary that has "meeting_id" & "name" key
@@ -170,7 +179,7 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
 
 
 @app.post("/end")
-def end_meeting(user: User):
+async def end_meeting(user: User):
     user = user.dict()
 
     # Check `meetings` table to confirm that user is meeting host
@@ -187,7 +196,7 @@ def end_meeting(user: User):
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
     remove_meeting(meeting_id=user['meeting_id'])
     # Broadcast that meeting is ended.
-    manager.broadcast_meeting(
+    await manager.broadcast_meeting(
         json={"event": "end_meeting"}, meeting_id=user['meeting_id'])
 
     # Format transcript for autoscriber.summarize()
@@ -213,10 +222,10 @@ def end_meeting(user: User):
     db.commit()
 
     # Broadcast download link to all users in this meeting
-    manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link},
+    await manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link},
                               meeting_id=user['meeting_id'])
     # Disconnect WS connection for all users in this meeting
-    manager.close_meeting(meeting_id=user['meeting_id'])
+    await manager.close_meeting(meeting_id=user['meeting_id'])
 
     return {"notes": notes, "download_link": download_link}
 
