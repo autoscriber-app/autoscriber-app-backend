@@ -101,6 +101,7 @@ def is_host(user: User):
     mycursor.execute(sql_get_host, params=sql_vals)
     return mycursor.fetchone() is not None
 
+
 @app.get("/version")
 def get_version():
     return app.version
@@ -134,7 +135,7 @@ def host_meeting():
 async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     user = User(meeting_id=meeting_id, uid=uid)
     host_ws = False
-    
+
     # If host WS, Check that user is host
     if is_host(user):
         host_ws = True
@@ -213,7 +214,7 @@ async def end_meeting(user: User):
     notes = md_format(notes)
 
     # Generate download link
-    download_link = f"{DOMAIN}/download?id={user['meeting_id']}"
+    download_link = f"/download?id={user['meeting_id']}"
 
     # Insert notes into processed table
     sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
@@ -222,8 +223,8 @@ async def end_meeting(user: User):
     db.commit()
 
     # Broadcast download link to all users in this meeting
-    await manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link},
-                              meeting_id=user['meeting_id'])
+    await manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link}, meeting_id=user['meeting_id'])
+
     # Disconnect WS connection for all users in this meeting
     await manager.close_meeting(meeting_id=user['meeting_id'])
 
