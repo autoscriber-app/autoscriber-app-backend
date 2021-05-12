@@ -107,6 +107,24 @@ def is_valid_meeting(meeting_id: str):
     return mycursor.fetchone() is not None
 
 
+# Websocket for host to connect to
+@app.websocket("/ws/{meeting_id}/{uid}")
+async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
+    user = User(meeting_id=meeting_id, uid=uid)
+    await manager.connect(websocket, user)
+
+    # Check whether user is host
+    host_ws = is_host(user)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+    except WebSocketDisconnect as e:
+        manager.disconnect(websocket, user)
+        if host_ws:
+            await end_meeting(user)
+
+
 # Client makes get request
 # Server responds with User dict
 @app.post("/host")
@@ -119,26 +137,6 @@ def host_meeting():
     mycursor.execute(sql_add_meeting, params=sql_vals)
     db.commit()
     return user
-
-
-# Websocket for host to connect to
-@app.websocket("/ws/{meeting_id}/{uid}")
-async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
-    user = User(meeting_id=meeting_id, uid=uid)
-    host_ws = False
-
-    # If host WS, Check that user is host
-    if is_host(user):
-        host_ws = True
-    await manager.connect(websocket, user)
-
-    try:
-        while True:
-            data = await websocket.receive_text()
-    except WebSocketDisconnect as e:
-        manager.disconnect(websocket, user)
-        if host_ws:
-            await end_meeting(user)
 
 
 # Client makes post request with a dictionary that has "meeting_id" & "name" key
@@ -156,7 +154,7 @@ def join_meeting(user: User):
 
 
 @app.post("/add")
-def add_to_transcript(transcript_entry: TranscriptEntry):
+async def add_to_transcript(transcript_entry: TranscriptEntry):
     user = transcript_entry.user
 
     # Check if meeting exists
@@ -168,6 +166,10 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
                 user.name, transcript_entry.dialogue)
     mycursor.execute(sql_add_dialogue, params=sql_vals)
     db.commit()
+
+    # Broadcast event to all meeeting participants
+    await manager.broadcast_meeting(
+        {'event': 'transcript_entry', 'name': user.name, 'message': transcript_entry.dialogue}, meeting_id=user.meeting_id)
 
 
 @app.post("/end")
