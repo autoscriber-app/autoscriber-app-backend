@@ -70,12 +70,6 @@ def sql_setup():
 
 sql_setup()
 
-def sqlClear():
-    sql_clear_old = '''
-    DELETE FROM `processed`
-    WHERE DATE(date) < now() - interval 30 DAY
-    '''
-    mycursor.execute(sql_clear_old)
 
 # Returns a random Uuid with the length of 10; makes sure that uuid isn't taken
 def uuidCreator():
