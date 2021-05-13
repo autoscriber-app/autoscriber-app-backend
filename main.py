@@ -20,15 +20,6 @@ import uvicorn
 app = FastAPI(title="Autoscriber App",
               description="Automatic online meeting notes with voice recognition and NLP.",
               version="0.0.1")
-# origins = ["https://autoscriber-app.github.io"]
-origins = ["*"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables
 USER = os.environ.get('SQL_USER')
@@ -107,6 +98,7 @@ def is_host(user: User):
     mycursor.execute(sql_get_host, params=sql_vals)
     return mycursor.fetchone() is not None
 
+
 @app.get("/version")
 def get_version():
     return app.version
@@ -121,6 +113,24 @@ def is_valid_meeting(meeting_id: str):
     return mycursor.fetchone() is not None
 
 
+# Websocket for host to connect to
+@app.websocket("/ws/{meeting_id}/{uid}")
+async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
+    user = User(meeting_id=meeting_id, uid=uid)
+    await manager.connect(websocket, user)
+
+    # Check whether user is host
+    host_ws = is_host(user)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+    except WebSocketDisconnect as e:
+        manager.disconnect(websocket, user)
+        if host_ws:
+            await end_meeting(user)
+
+
 # Client makes get request
 # Server responds with User dict
 @app.post("/host")
@@ -133,26 +143,6 @@ def host_meeting():
     mycursor.execute(sql_add_meeting, params=sql_vals)
     db.commit()
     return user
-
-
-# Websocket for host to connect to
-@app.websocket("/ws/{meeting_id}/{uid}")
-async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
-    user = User(meeting_id=meeting_id, uid=uid)
-    host_ws = False
-    
-    # If host WS, Check that user is host
-    if is_host(user):
-        host_ws = True
-    await manager.connect(websocket, user)
-
-    try:
-        while True:
-            data = await websocket.receive_text()
-    except WebSocketDisconnect as e:
-        manager.disconnect(websocket, user)
-        if host_ws:
-            await end_meeting(user)
 
 
 # Client makes post request with a dictionary that has "meeting_id" & "name" key
@@ -170,7 +160,7 @@ def join_meeting(user: User):
 
 
 @app.post("/add")
-def add_to_transcript(transcript_entry: TranscriptEntry):
+async def add_to_transcript(transcript_entry: TranscriptEntry):
     user = transcript_entry.user
 
     # Check if meeting exists
@@ -182,6 +172,10 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
                 user.name, transcript_entry.dialogue)
     mycursor.execute(sql_add_dialogue, params=sql_vals)
     db.commit()
+
+    # Broadcast event to all meeeting participants
+    await manager.broadcast_meeting(
+        {'event': 'transcript_entry', 'name': user.name, 'message': transcript_entry.dialogue}, meeting_id=user.meeting_id)
 
 
 @app.post("/end")
@@ -219,7 +213,7 @@ async def end_meeting(user: User):
     notes = md_format(notes)
 
     # Generate download link
-    download_link = f"{DOMAIN}/download?id={user['meeting_id']}"
+    download_link = f"/download?id={user['meeting_id']}"
 
     # Insert notes into processed table
     sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
@@ -228,8 +222,8 @@ async def end_meeting(user: User):
     db.commit()
 
     # Broadcast download link to all users in this meeting
-    await manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link},
-                              meeting_id=user['meeting_id'])
+    await manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link}, meeting_id=user['meeting_id'])
+
     # Disconnect WS connection for all users in this meeting
     await manager.close_meeting(meeting_id=user['meeting_id'])
 
