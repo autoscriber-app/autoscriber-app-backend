@@ -17,8 +17,6 @@ from WSConnectionManager import ConnectionManager
 import aiofiles
 import uvicorn
 
-import time
-
 # Set up FastAPI app
 app = FastAPI(title="Autoscriber App",
               description="Automatic online meeting notes with voice recognition and NLP.",
