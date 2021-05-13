@@ -3,37 +3,30 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 from autoscriber import summarize
-
-from basemodels import User, TranscriptEntry
-from WSConnectionManager import ConnectionManager
-
+from apscheduler.schedulers.background import BackgroundScheduler
 import uuid
 import tempfile
 import os
 import random
 import string
+
+from basemodels import User, TranscriptEntry
+from WSConnectionManager import ConnectionManager
+
 # Not needed for code, but dependencies needed for requirements
 import aiofiles
 import uvicorn
 
+import time
 
+# Set up FastAPI app
 app = FastAPI(title="Autoscriber App",
               description="Automatic online meeting notes with voice recognition and NLP.",
               version="0.0.1")
-# origins = ["https://autoscriber-app.github.io"]
-origins = ["*"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 DOMAIN = "https://autoscriber.sagg.in:8000"
-# Get environ variables
+# Get environ variables & connect to MySQL db
 USER = os.environ.get('SQL_USER')
 PASSWORD = os.environ.get('SQL_PASS')
-# Connect to mysql db
 db = mysql.connector.connect(
     host="localhost",
     user=USER,
@@ -41,11 +34,23 @@ db = mysql.connector.connect(
     database="autoscriber_app"
 )
 mycursor = db.cursor()
+# WebSocket manager
 manager = ConnectionManager()
+# Task scheduler for cleaning processed table
+scheduler = BackgroundScheduler(daemon=True)
 
 
-# Setting up sql - Creating Tables
+@app.on_event('startup')
+def startup_event():
+    sql_setup()
+
+    # Add job and start scheduler
+    scheduler.add_job(sql_clean_processed, 'cron', day="*", hour="0")
+    scheduler.start()
+
+
 def sql_setup():
+    """Setting up sql - Creating Tables"""
     unprocessed = '''
         CREATE TABLE IF NOT EXISTS `unprocessed` (
             `meeting_id` char(38) NOT NULL,
@@ -74,17 +79,12 @@ def sql_setup():
     '''
     for e in (unprocessed, processed, meetings):
         mycursor.execute(e)
-    print("Tables are ready!")
 
 
-sql_setup()
+@app.on_event('shutdown')
+def shutdown_event():
+    scheduler.shutdown()
 
-def sqlClear():
-    sql_clear_old = '''
-    DELETE FROM `processed`
-    WHERE DATE(date) < now() - interval 30 DAY
-    '''
-    mycursor.execute(sql_clear_old)
 
 # Returns a random Uuid with the length of 10; makes sure that uuid isn't taken
 def uuidCreator():
@@ -106,6 +106,7 @@ def is_host(user: User):
     sql_vals = (user['meeting_id'], user['uid'])
     mycursor.execute(sql_get_host, params=sql_vals)
     return mycursor.fetchone() is not None
+
 
 @app.get("/version")
 def get_version():
@@ -140,7 +141,7 @@ def host_meeting():
 async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
     user = User(meeting_id=meeting_id, uid=uid)
     host_ws = False
-    
+
     # If host WS, Check that user is host
     if is_host(user):
         host_ws = True
@@ -170,7 +171,7 @@ def join_meeting(user: User):
 
 
 @app.post("/add")
-def add_to_transcript(transcript_entry: TranscriptEntry):
+async def add_to_transcript(transcript_entry: TranscriptEntry):
     user = transcript_entry.user
 
     # Check if meeting exists
@@ -182,6 +183,12 @@ def add_to_transcript(transcript_entry: TranscriptEntry):
                 user.name, transcript_entry.dialogue)
     mycursor.execute(sql_add_dialogue, params=sql_vals)
     db.commit()
+
+    res_json = {'event': 'transcript_entry',
+                'name': user.name,
+                'message': transcript_entry.dialogue}
+    # Broadcast event to all meeeting participants
+    await manager.broadcast_meeting(res_json, meeting_id=user.meeting_id)
 
 
 @app.post("/end")
@@ -200,10 +207,9 @@ async def end_meeting(user: User):
 
     # Now that meeting is ended, we can clean db of all dialogue from the meeting
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
-    remove_meeting(meeting_id=user['meeting_id'])
+    sql_remove_meeting(meeting_id=user['meeting_id'])
     # Broadcast that meeting is ended.
-    await manager.broadcast_meeting(
-        json={"event": "end_meeting"}, meeting_id=user['meeting_id'])
+    await manager.broadcast_meeting({'event': 'end_meeting'}, meeting_id=user['meeting_id'])
 
     # Format transcript for autoscriber.summarize()
     transcript = []
@@ -227,17 +233,16 @@ async def end_meeting(user: User):
     mycursor.execute(sql_insert_notes, params=sql_vals)
     db.commit()
 
+    res_json = {"event": "done_processing", "download_link": download_link}
     # Broadcast download link to all users in this meeting
-    await manager.broadcast_meeting(json={"event": "done_processing", "download_link": download_link},
-                              meeting_id=user['meeting_id'])
+    await manager.broadcast_meeting(res_json, meeting_id=user['meeting_id'])
     # Disconnect WS connection for all users in this meeting
     await manager.close_meeting(meeting_id=user['meeting_id'])
-
-    return {"notes": notes, "download_link": download_link}
+    return res_json
 
 
 # Removes a given meeting_id from `unprocessed` and `meetings` tables
-def remove_meeting(meeting_id: str):
+def sql_remove_meeting(meeting_id: str):
     sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = %s",
                           "DELETE FROM meetings WHERE meeting_id = %s")
     sql_vals = (meeting_id,)
@@ -271,3 +276,12 @@ def download_notes(id: str):
     fname = f'{date.date()}-notes.md'
     md_file.write(bytes(notes, encoding='utf-8'))
     return FileResponse(md_file.name, media_type="markdown", filename=fname)
+
+
+def sql_clean_processed():
+    sql_clear_old = '''
+    DELETE FROM `processed`
+    WHERE DATE(date) < now() - interval 30 DAY
+    '''
+    mycursor.execute(sql_clear_old)
+    db.commit()
