@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 from autoscriber import summarize
 from apscheduler.schedulers.background import BackgroundScheduler
+from colorama import Fore
 import uuid
 import tempfile
 import os
@@ -40,11 +41,14 @@ scheduler = BackgroundScheduler(daemon=True)
 
 @app.on_event('startup')
 def startup_event():
+    """FastAPI startup event. Setup SQL and start BackgroundScheduler"""
     sql_setup()
-
+    print(Fore.GREEN + "PROCESS:\t" + Fore.MAGENTA + "SQL tables ready!")
     # Add job and start scheduler
     scheduler.add_job(sql_clean_processed, 'cron', day="*", hour="0")
     scheduler.start()
+    print(Fore.GREEN + "PROCESS:\t" + Fore.MAGENTA +
+          "BackgroundScheduler started!")
 
 
 def sql_setup():
@@ -81,11 +85,14 @@ def sql_setup():
 
 @app.on_event('shutdown')
 def shutdown_event():
+    """FastAPI shutdown event"""
     scheduler.shutdown()
+    print(Fore.GREEN + "PROCESS:\t" + Fore.MAGENTA +
+          "BackgroundScheduler shutdown!")
 
 
-# Returns a random Uuid with the length of 10; makes sure that uuid isn't taken
 def uuidCreator():
+    """Returns a random Uuid with the length of 10; makes sure that uuid isn't taken"""
     randomUuid = ''.join(random.choices(
         string.ascii_uppercase + string.digits, k=10))
     sql_check_uuid = "SELECT `meeting_id` FROM meetings WHERE meeting_id=\"%s\""
@@ -96,8 +103,8 @@ def uuidCreator():
     return randomUuid
 
 
-# Checks if user is host of a current meeting
 def is_host(user: User):
+    """Checks if user is host of a current meeting"""
     if isinstance(user, User):
         user = user.dict()
     sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s AND host_uid = %s"
@@ -108,22 +115,23 @@ def is_host(user: User):
 
 @app.get("/version")
 def get_version():
+    """Returns the app version"""
     return app.version
 
 
 # Checks if meeting id corresponds to a current meeting
 @app.post("/is_valid_meeting")
 def is_valid_meeting(meeting_id: str):
+    """Checks if a given meeting_id is valid"""
     sql_get_host = "SELECT * FROM meetings WHERE meeting_id = %s"
     sql_vals = (meeting_id,)
     mycursor.execute(sql_get_host, params=sql_vals)
     return mycursor.fetchone() is not None
 
 
-# Client makes get request
-# Server responds with User dict
 @app.post("/host")
 def host_meeting():
+    """Hosts a meeting"""
     user = {'meeting_id': uuidCreator(), 'uid': str(uuid.uuid4())}
 
     # Create meeting in meetings db
@@ -134,9 +142,9 @@ def host_meeting():
     return user
 
 
-# Websocket for host to connect to
 @app.websocket("/ws/{meeting_id}/{uid}")
 async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
+    """Websocket for all users to connect to"""
     user = User(meeting_id=meeting_id, uid=uid)
     host_ws = False
 
@@ -154,10 +162,9 @@ async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
             await end_meeting(user)
 
 
-# Client makes post request with a dictionary that has "meeting_id" & "name" key
-# Server responds with User
 @app.post("/join")
 def join_meeting(user: User):
+    """Joins a specified meeting"""
     user = user.dict()
 
     # Check if meeting exists
@@ -170,6 +177,8 @@ def join_meeting(user: User):
 
 @app.post("/add")
 async def add_to_transcript(transcript_entry: TranscriptEntry):
+    """Adds a transcript entry to SQL"""
+
     user = transcript_entry.user
 
     # Check if meeting exists
@@ -191,6 +200,7 @@ async def add_to_transcript(transcript_entry: TranscriptEntry):
 
 @app.post("/end")
 async def end_meeting(user: User):
+    """Ends a meeting - User must be host"""
     user = user.dict()
 
     # Check `meetings` table to confirm that user is meeting host
@@ -239,8 +249,8 @@ async def end_meeting(user: User):
     return res_json
 
 
-# Removes a given meeting_id from `unprocessed` and `meetings` tables
 def sql_remove_meeting(meeting_id: str):
+    """Removes a given meeting_id from `unprocessed` and `meetings` tables"""
     sql_remove_meeting = ("DELETE FROM unprocessed WHERE meeting_id = %s",
                           "DELETE FROM meetings WHERE meeting_id = %s")
     sql_vals = (meeting_id,)
@@ -252,6 +262,7 @@ def sql_remove_meeting(meeting_id: str):
 
 
 def md_format(notes):
+    """Simple function to convert format summarized notes in md"""
     md = ""
     for line in notes:
         md += f"- {line}  \n"
@@ -260,6 +271,7 @@ def md_format(notes):
 
 @app.get("/download")
 def download_notes(id: str):
+    """Sends a file response to download summarized notes"""
     # Query sql `processed` table from notes
     sql_get_processed = "SELECT notes, date FROM processed WHERE meeting_id = %s"
     sql_vals = (id,)
@@ -277,9 +289,11 @@ def download_notes(id: str):
 
 
 def sql_clean_processed():
+    """Clean processed table to remove 30+ day old notes"""
     sql_clear_old = '''
     DELETE FROM `processed`
     WHERE DATE(date) < now() - interval 30 DAY
     '''
     mycursor.execute(sql_clear_old)
     db.commit()
+    print(Fore.GREEN + "PROCESS:\t" + Fore.MAGENTA + "30+ day old notes cleaned!")
