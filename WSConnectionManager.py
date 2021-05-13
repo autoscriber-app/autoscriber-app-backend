@@ -22,19 +22,17 @@ class ConnectionManager:
         self.meetings[user.meeting_id][user.uid] = websocket
         self.active_users[user.uid] = websocket
 
-    # Closes a single websocket and removes from active_users list
-    # Function needs as parameter either User or websocket of the user
-    async def close(self, user: User = None, websocket: Optional[WebSocket] = None):
+    # Closes and removes a single websocket
+    async def close(self, user: User, websocket: Optional[WebSocket] = None):
         if not websocket:
             websocket = self.active_users[user.uid]
         await websocket.close()
 
-    # Closes and removes all WebSockets for an entire meeting
     async def close_meeting(self, meeting_id: str):
-        for uid in list(self.meetings[meeting_id]):
+        for uid in self.meetings[meeting_id]:
             user = User(meeting_id=meeting_id, uid=uid)
             await self.close(user=user)
-        self.meetings.pop(meeting_id)
+        self.meetings.pop()
 
     # Removes a single websocket from self.meetings and self.active_users
     def disconnect(self, websocket: WebSocket, user: User):
@@ -49,7 +47,7 @@ class ConnectionManager:
             self.active_users.pop(user.uid)
 
     # Send a message to a specific user
-    # Function needs as parameter a message and either the uid(user_id) or websocket of the user
+    # This method needs either the uid(user_id) or websocket of the user
     async def send_personal_message(self, message: str, websocket: WebSocket = None, uid: str = None):
         if websocket:
             await websocket.send_text(message)
