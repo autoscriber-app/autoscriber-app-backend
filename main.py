@@ -63,12 +63,13 @@ def sql_setup():
     """Setting up sql - Creating Tables"""
     unprocessed = '''
         CREATE TABLE IF NOT EXISTS `unprocessed` (
+            `row_id` int NOT NULL AUTO_INCREMENT,
             `meeting_id` char(38) NOT NULL,
             `uid` char(38) NOT NULL,
             `name` varchar(255) NOT NULL,
             `dialogue` LONGTEXT NOT NULL,
             `time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (meeting_id, uid, time)
+            PRIMARY KEY (row_id)
         ) DEFAULT CHARSET = utf8;
     '''
     processed = '''
@@ -233,7 +234,7 @@ async def end_meeting(user: User):
     # Format transcript for autoscriber.summarize()
     transcript = []
     for line in unprocessed:
-        name, dialogue = line[0], line[1].strip()
+        name, dialogue = line[0], str(line[1].strip())
         if dialogue[-1] not in "!.,":
             dialogue += "."
         transcript.append(f"{name}: {dialogue}")
