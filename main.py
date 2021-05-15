@@ -22,6 +22,14 @@ import uvicorn
 app = FastAPI(title="Autoscriber",
               description="Automatic online meeting notes with voice recognition and NLP.",
               version="0.0.1")
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables & connect to MySQL db
 USER = os.environ.get('SQL_USER')
@@ -195,6 +203,7 @@ async def add_to_transcript(transcript_entry: TranscriptEntry):
 
     res_json = {'event': 'transcript_entry',
                 'name': user.name,
+                'uid': user.uid,
                 'message': transcript_entry.dialogue}
     # Broadcast event to all meeeting participants
     await manager.broadcast_meeting(res_json, meeting_id=user.meeting_id)
@@ -232,7 +241,7 @@ async def end_meeting(user: User):
 
     # Summarize notes using autoscriber.summarize()
     notes = summarize(transcript)
-    notes = md_format(notes)
+    notes = format_notes(notes)
 
     # Generate download links
     notes_link, transcript_link = f"/notes?id={user['meeting_id']}", f"/transcript?id={user['meeting_id']}"
@@ -265,7 +274,7 @@ def sql_remove_meeting(meeting_id: str):
     db.commit()
 
 
-def md_format(notes):
+def format_notes(notes):
     """Simple function to convert format summarized notes in md"""
     md = ""
     for line in notes:
@@ -287,7 +296,7 @@ def download_notes(id: str):
 
     # Create md file for file response
     md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
-    fname = f'{date.date()}-notes.txt'
+    fname = f'{date.date()}_{id}_notes.txt'
     md_file.write(bytes(notes, encoding='utf-8'))
     return FileResponse(md_file.name, media_type="text", filename=fname)
 
@@ -306,7 +315,7 @@ def download_transcript(id: str):
 
     # Create md file for file response
     md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
-    fname = f'{date.date()}-transcript.txt'
+    fname = f'{date.date()}_{id}_transcript.txt'
     md_file.write(bytes(transcript, encoding='utf-8'))
     return FileResponse(md_file.name, media_type="text", filename=fname)
 
