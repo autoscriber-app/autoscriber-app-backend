@@ -140,6 +140,32 @@ def is_valid_meeting(meeting_id: str):
     return mycursor.fetchone() is not None
 
 
+@app.websocket("/ws/{meeting_id}/{uid}")
+async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
+    """Websocket for all users to connect to"""
+    user = User(meeting_id=meeting_id, uid=uid)
+    await manager.connect(websocket, user)
+
+    host_ws = False
+    # If host WS, Check that user is host
+    if is_host(user):
+        host_ws = True
+
+    # If user has joined late, send previous dialogue to user.
+    join_meeting_event = {'event': 'join_meeting',
+                          'previous_dialogue': get_meeting_dialogues(meeting_id)}
+    if len(join_meeting_event['previous_dialogue']) >= 1:
+        await websocket.send_json(join_meeting_event)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+    except WebSocketDisconnect as e:
+        manager.disconnect(websocket, user)
+        if host_ws:
+            await end_meeting(user)
+
+
 @app.post("/host")
 def host_meeting():
     """Hosts a meeting"""
@@ -151,26 +177,6 @@ def host_meeting():
     mycursor.execute(sql_add_meeting, params=sql_vals)
     db.commit()
     return user
-
-
-@app.websocket("/ws/{meeting_id}/{uid}")
-async def connect_websocket(websocket: WebSocket, meeting_id: str, uid: str):
-    """Websocket for all users to connect to"""
-    user = User(meeting_id=meeting_id, uid=uid)
-    host_ws = False
-
-    # If host WS, Check that user is host
-    if is_host(user):
-        host_ws = True
-    await manager.connect(websocket, user)
-
-    try:
-        while True:
-            data = await websocket.receive_text()
-    except WebSocketDisconnect as e:
-        manager.disconnect(websocket, user)
-        if host_ws:
-            await end_meeting(user)
 
 
 @app.post("/join")
@@ -210,6 +216,14 @@ async def add_to_transcript(transcript_entry: TranscriptEntry):
     await manager.broadcast_meeting(res_json, meeting_id=user.meeting_id)
 
 
+def get_meeting_dialogues(meeting_id: str):
+    """Get dialogue blobs from `unprocessed` table"""
+    sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
+    sql_vals = (meeting_id,)
+    mycursor.execute(sql_get_dialogue, params=sql_vals)
+    return mycursor.fetchall()
+
+
 @app.post("/end")
 async def end_meeting(user: User):
     """Ends a meeting - User must be host"""
@@ -219,11 +233,7 @@ async def end_meeting(user: User):
     if not is_host(user):
         return HTTPException(status_code=403, detail="User must be meeting host to end meeting")
 
-    # Get dialogue blobs from `unprocessed` table
-    sql_get_dialogue = "SELECT name, dialogue FROM unprocessed WHERE meeting_id = %s ORDER BY time"
-    sql_vals = (user['meeting_id'],)
-    mycursor.execute(sql_get_dialogue, params=sql_vals)
-    unprocessed = mycursor.fetchall()
+    unprocessed = get_meeting_dialogues(user['meeting_id'])
 
     # Now that meeting is ended, we can clean db of all dialogue from the meeting
     # Delete all rows from `unprocessed` & `meetings` where meeting_id = user's meeting_id
