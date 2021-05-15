@@ -22,14 +22,14 @@ import uvicorn
 app = FastAPI(title="Autoscriber",
               description="Automatic online meeting notes with voice recognition and NLP.",
               version="0.0.1")
-origins = ["*"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# origins = ["*"]
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 DOMAIN = "https://autoscriber.sagg.in:8000"
 # Get environ variables & connect to MySQL db
 USER = os.environ.get('SQL_USER')
