@@ -19,7 +19,7 @@ import aiofiles
 import uvicorn
 
 # Set up FastAPI app
-app = FastAPI(title="Autoscriber App",
+app = FastAPI(title="Autoscriber",
               description="Automatic online meeting notes with voice recognition and NLP.",
               version="0.0.1")
 DOMAIN = "https://autoscriber.sagg.in:8000"
@@ -60,14 +60,16 @@ def sql_setup():
             `name` varchar(255) NOT NULL,
             `dialogue` LONGTEXT NOT NULL,
             `time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (meeting_id, time)
+            PRIMARY KEY (meeting_id, uid, time)
         ) DEFAULT CHARSET = utf8;
     '''
     processed = '''
         CREATE TABLE IF NOT EXISTS `processed` (
             `meeting_id` char(38) NOT NULL,
             `notes` LONGTEXT NOT NULL,
-            `download_link` TINYTEXT NOT NULL,
+            `notes_link` TINYTEXT NOT NULL,
+            `transcript` LONGTEXT NOT NULL,
+            `transcript_link` TINYTEXT NOT NULL,
             date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (meeting_id)
         ) DEFAULT CHARSET = utf8;
@@ -232,16 +234,18 @@ async def end_meeting(user: User):
     notes = summarize(transcript)
     notes = md_format(notes)
 
-    # Generate download link
-    download_link = f"{DOMAIN}/download?id={user['meeting_id']}"
+    # Generate download links
+    notes_link, transcript_link = f"/notes?id={user['meeting_id']}", f"/transcript?id={user['meeting_id']}"
 
-    # Insert notes into processed table
-    sql_insert_notes = "INSERT INTO processed (meeting_id, notes, download_link) VALUES (%s, %s, %s)"
-    sql_vals = (user['meeting_id'], notes, download_link)
+    # Insert notes, transcript into processed table
+    sql_insert_notes = "INSERT INTO processed (meeting_id, notes, notes_link, transcript, transcript_link) VALUES (%s, %s, %s, %s, %s)"
+    sql_vals = (user['meeting_id'], notes, notes_link,
+                transcript, transcript_link)
     mycursor.execute(sql_insert_notes, params=sql_vals)
     db.commit()
 
-    res_json = {"event": "done_processing", "download_link": download_link}
+    res_json = {"event": "done_processing",
+                "notes_link": notes_link, "transcript_link": transcript_link}
     # Broadcast download link to all users in this meeting
     await manager.broadcast_meeting(res_json, meeting_id=user['meeting_id'])
     # Disconnect WS connection for all users in this meeting
@@ -269,7 +273,7 @@ def md_format(notes):
     return md
 
 
-@app.get("/download")
+@app.get("/notes")
 def download_notes(id: str):
     """Sends a file response to download summarized notes"""
     # Query sql `processed` table from notes
@@ -278,14 +282,33 @@ def download_notes(id: str):
     mycursor.execute(sql_get_processed, params=sql_vals)
     res = mycursor.fetchone()
     if res is None:
-        return HTTPException(status_code=406, detail="Meeting does not exist")
+        return HTTPException(status_code=406, detail="Meeting does not exist. Meeting notes & transcripts are only stored for 30 days.")
     notes, date = res
 
     # Create md file for file response
-    md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.md')
-    fname = f'{date.date()}-notes.md'
+    md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
+    fname = f'{date.date()}-notes.txt'
     md_file.write(bytes(notes, encoding='utf-8'))
-    return FileResponse(md_file.name, media_type="markdown", filename=fname)
+    return FileResponse(md_file.name, media_type="text", filename=fname)
+
+
+@app.get("/transcript")
+def download_transcript(id: str):
+    """Sends a file response to download raw transcript"""
+    # Query sql `processed` table from notes
+    sql_get_processed = "SELECT transcript, date FROM processed WHERE meeting_id = %s"
+    sql_vals = (id,)
+    mycursor.execute(sql_get_processed, params=sql_vals)
+    res = mycursor.fetchone()
+    if res is None:
+        return HTTPException(status_code=406, detail="Meeting does not exist. Meeting notes & transcripts are only stored for 30 days.")
+    transcript, date = res
+
+    # Create md file for file response
+    md_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
+    fname = f'{date.date()}-transcript.txt'
+    md_file.write(bytes(transcript, encoding='utf-8'))
+    return FileResponse(md_file.name, media_type="text", filename=fname)
 
 
 def sql_clean_processed():

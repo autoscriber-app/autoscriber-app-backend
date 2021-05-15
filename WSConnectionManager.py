@@ -32,7 +32,7 @@ class ConnectionManager:
         for uid in self.meetings[meeting_id]:
             user = User(meeting_id=meeting_id, uid=uid)
             await self.close(user=user)
-        self.meetings.pop()
+        self.meetings.pop(meeting_id)
 
     # Removes a single websocket from self.meetings and self.active_users
     def disconnect(self, websocket: WebSocket, user: User):
